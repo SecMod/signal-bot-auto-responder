@@ -23,7 +23,8 @@ class SignalClient:
         command=[cli, "-a", self.account, *args]
         try:
             result=subprocess.run(
-                command, capture_output=True, text=True, check=False,
+                command, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", check=False,
                 shell=cli.lower().endswith((".bat",".cmd")),
             )
         except FileNotFoundError as exc:
