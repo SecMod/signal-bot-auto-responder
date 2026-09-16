@@ -7,6 +7,8 @@ class Settings:
     interval_minutes: int = 15
     variation_count: int = 24
     cycle_hours: int = 6
+    signal_account: str = ""
+    signal_group_id: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -20,4 +22,6 @@ class Settings:
             cycle_hours=int(
                 os.getenv("CYCLE_HOURS", "6")
             ),
+            signal_account=os.getenv("SIGNAL_ACCOUNT", "").strip(),
+            signal_group_id=os.getenv("SIGNAL_GROUP_ID", "").strip(),
         )
