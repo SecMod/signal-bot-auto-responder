@@ -8,6 +8,7 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     monkeypatch.setattr("src.gui.messagebox.showinfo", lambda *a, **k: None)
     monkeypatch.setattr("src.gui.messagebox.showwarning", lambda *a, **k: None)
     monkeypatch.setattr("src.gui.messagebox.showerror", lambda *a, **k: None)
+    monkeypatch.setattr("src.gui.messagebox.askyesno", lambda *a, **k: True)
 
     app = App()
     app.storage = Storage(str(tmp_path / "gui.db"))
@@ -21,6 +22,17 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
 
     app.show("packs")
     assert app.storage.list_packs()[0]["approved_count"] == 24
+    tree = next(w for w in app.content.winfo_children() if w.winfo_class() == "Treeview")
+    tree.selection_set("1")
+    app.delete_pack(tree)
+    assert app.storage.list_packs() == []
+
+    app.show("generator")
+    app.source.delete("1.0", "end")
+    app.source.insert("1.0", "Second authorized assessment")
+    app.generate()
+    app.save_pack()
+    assert len(app.storage.list_packs()) == 1
 
     app.show("groups")
     app.gname.insert(0, "Authorized Group")
