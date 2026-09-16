@@ -18,8 +18,9 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         def positive(name: str, default: str) -> int:
+            raw = os.getenv(name, default)
             try:
-                value = int(os.getenv(name, default))
+                value = int(raw)
             except ValueError as exc:
                 raise ValueError(f"{name} must be an integer.") from exc
             if value <= 0:
