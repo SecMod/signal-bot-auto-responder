@@ -14,7 +14,7 @@ from dataclasses import dataclass
 @dataclass
 class SignalClient:
     account: str
-    signal_cli: str = "signal-cli"
+    signal_cli: str = r"C:\Users\prakh\signal-cli\signal-cli-0.14.8\bin\signal-cli.bat"
 
     def send_to_group(self, group_id: str, message: str) -> None:
         """Send an approved message to a configured Signal group."""
