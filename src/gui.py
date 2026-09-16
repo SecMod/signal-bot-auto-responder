@@ -11,6 +11,7 @@ from .storage import Storage
 
 BG="#070a09"; PANEL="#101815"; PANEL2="#131d18"; GREEN="#39ff88"; WHITE="#f2fff8"; MUTED="#8da99b"; RED="#ff5c6c"
 
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -26,6 +27,7 @@ class App(tk.Tk):
         self._build_nav()
         self.content.pack(fill="both",expand=True,padx=15,pady=15)
         self.show("generator")
+
     def _load_settings(self):
         base=Settings.from_env()
         return Settings(
@@ -36,22 +38,70 @@ class App(tk.Tk):
             str(self.storage.get_setting("signal_enabled",str(base.signal_enabled))).lower()=="true",
             self.storage.get_setting("signal_cli_path",base.signal_cli_path),
         )
+
     def _build_nav(self):
         bar=tk.Frame(self,bg=PANEL); bar.pack(fill="x")
         for key,label in [("generator","Message Generator"),("packs","Saved Packs"),("groups","Authorized Groups"),("scheduler","Scheduler"),("settings","Settings"),("logs","Logs")]:
             tk.Button(bar,text=label,command=lambda k=key:self.show(k),bg=PANEL2,fg=WHITE,relief="flat",padx=14,pady=10).pack(side="left",padx=2,pady=2)
+
     def clear(self):
         for w in self.content.winfo_children(): w.destroy()
+
     def show(self,key):
         self.clear()
         getattr(self,"_view_"+key)()
+
     def _title(self,text):
         tk.Label(self.content,text=text,bg=BG,fg=GREEN,font=("Segoe UI",20,"bold")).pack(anchor="w",pady=(0,10))
+
     def _view_generator(self):
         self._title("MESSAGE GENERATOR")
-        self.source=tk.Text(self.content,height=7,bg="#09100d",fg=WHITE,insertbackground=GREEN,wrap="word"); self.source.pack(fill="x",pady=8)
+        self.source=tk.Text(self.content,height=7,bg="#09100d",fg=WHITE,insertbackground=GREEN,wrap="word")
+        self.source.pack(fill="x",pady=8)
         tk.Button(self.content,text="GENERATE 24 VARIATIONS",command=self.generate,bg=GREEN,fg=BG).pack(anchor="w")
-        self.review=tk.Frame(self.content,bg=BG); self.review.pack(fill="both",expand=True,pady=10)
+
+        # Scrollable review area. The save button stays outside the scrolling
+        # canvas so it is always visible even when all 24 variations are shown.
+        review_shell=tk.Frame(self.content,bg=BG)
+        review_shell.pack(fill="both",expand=True,pady=(10,4))
+
+        self.review_canvas=tk.Canvas(review_shell,bg=BG,highlightthickness=0)
+        self.review_scrollbar=ttk.Scrollbar(review_shell,orient="vertical",command=self.review_canvas.yview)
+        self.review_canvas.configure(yscrollcommand=self.review_scrollbar.set)
+
+        self.review_scrollbar.pack(side="right",fill="y")
+        self.review_canvas.pack(side="left",fill="both",expand=True)
+
+        self.review=tk.Frame(self.review_canvas,bg=BG)
+        self.review_window=self.review_canvas.create_window((0,0),window=self.review,anchor="nw")
+
+        self.review.bind(
+            "<Configure>",
+            lambda e:self.review_canvas.configure(scrollregion=self.review_canvas.bbox("all"))
+        )
+        self.review_canvas.bind(
+            "<Configure>",
+            lambda e:self.review_canvas.itemconfigure(self.review_window,width=e.width)
+        )
+        self.review_canvas.bind("<MouseWheel>",self._review_mousewheel)
+        self.review.bind("<MouseWheel>",self._review_mousewheel)
+
+        self.save_button=tk.Button(
+            self.content,
+            text="SAVE APPROVED PACK",
+            command=self.save_pack,
+            bg=GREEN,
+            fg=BG,
+            font=("Segoe UI",10,"bold"),
+            padx=16,
+            pady=8,
+        )
+        self.save_button.pack(anchor="e",pady=(4,0))
+
+    def _review_mousewheel(self,event):
+        self.review_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        return "break"
+
     def generate(self):
         src=self.source.get("1.0","end").strip()
         if not src:return messagebox.showwarning("Message","Enter a message first.")
@@ -59,10 +109,16 @@ class App(tk.Tk):
         self.vars=[]
         for i,m in enumerate(generate_variations(src,24),1):
             row=tk.Frame(self.review,bg=PANEL); row.pack(fill="x",pady=2)
-            v=tk.BooleanVar(value=True); tk.Checkbutton(row,text=f"{i:02d}",variable=v,bg=PANEL,fg=GREEN,selectcolor=BG).pack(side="left")
-            box=tk.Text(row,height=2,bg="#09100d",fg=WHITE,insertbackground=GREEN,wrap="word"); box.insert("1.0",m); box.pack(side="left",fill="x",expand=True)
+            v=tk.BooleanVar(value=True)
+            tk.Checkbutton(row,text=f"{i:02d}",variable=v,bg=PANEL,fg=GREEN,selectcolor=BG).pack(side="left")
+            box=tk.Text(row,height=2,bg="#09100d",fg=WHITE,insertbackground=GREEN,wrap="word")
+            box.insert("1.0",m)
+            box.pack(side="left",fill="x",expand=True)
             self.vars.append((v,box))
-        tk.Button(self.review,text="SAVE APPROVED PACK",command=self.save_pack,bg=GREEN,fg=BG).pack(anchor="e",pady=6)
+        self.review.update_idletasks()
+        self.review_canvas.configure(scrollregion=self.review_canvas.bbox("all"))
+        self.review_canvas.yview_moveto(0)
+
     def save_pack(self):
         try:
             src=self.source.get("1.0","end").strip()
@@ -74,6 +130,7 @@ class App(tk.Tk):
         except Exception as e:
             self.storage.log("ERROR",f"Pack save failed: {e}")
             messagebox.showerror("Saved Pack",str(e))
+
     def _view_packs(self):
         self._title("SAVED PACKS")
         tree=ttk.Treeview(self.content,columns=("id","date","source","count","approved"),show="headings")
@@ -83,10 +140,12 @@ class App(tk.Tk):
         buttons=tk.Frame(self.content,bg=BG);buttons.pack(fill="x",pady=8)
         tk.Button(buttons,text="OPEN SELECTED",command=lambda:self.open_pack(tree),bg=PANEL2,fg=WHITE).pack(side="left")
         tk.Button(buttons,text="DELETE SELECTED",command=lambda:self.delete_pack(tree),bg=RED,fg=BG).pack(side="right")
+
     def open_pack(self,tree):
         s=tree.selection()
         if not s:return
         p=self.storage.get_pack(int(s[0])); self._edit_pack(p)
+
     def _edit_pack(self,p):
         self.clear(); self._title(f"PACK #{p['id']} — EDIT")
         tk.Label(self.content,text=p["source"],bg=BG,fg=MUTED,wraplength=1000).pack(anchor="w")
@@ -103,6 +162,7 @@ class App(tk.Tk):
                 self.storage.log("INFO",f"Updated pack #{p['id']}");self.show("packs")
             except Exception as e:messagebox.showerror("Pack",str(e))
         tk.Button(self.content,text="SAVE CHANGES",command=save,bg=GREEN,fg=BG).pack(anchor="e")
+
     def delete_pack(self,tree):
         s=tree.selection()
         if not s:return
@@ -114,6 +174,7 @@ class App(tk.Tk):
         except Exception as e:
             self.storage.log("ERROR",f"Pack delete failed: {e}")
             messagebox.showerror("Delete Pack",str(e))
+
     def _view_groups(self):
         self._title("AUTHORIZED SIGNAL GROUPS")
         f=tk.Frame(self.content,bg=BG);f.pack(fill="x",pady=8)
@@ -127,21 +188,26 @@ class App(tk.Tk):
         tk.Button(self.content,text="ENABLE SELECTED",command=lambda:self.set_selected_groups(True),bg=GREEN,fg=BG).pack(side="left",padx=3)
         tk.Button(self.content,text="DISABLE SELECTED",command=lambda:self.set_selected_groups(False),bg="#d6a900",fg=BG).pack(side="left",padx=3)
         tk.Button(self.content,text="REMOVE SELECTED",command=self.remove_group,bg=RED,fg=BG).pack(side="right")
+
     def refresh_groups(self):
         if not hasattr(self,"gtree"):return
         for i in self.gtree.get_children():self.gtree.delete(i)
         for g in self.storage.get_groups():self.gtree.insert("","end",iid=str(g["id"]),values=(g["name"],g["group_id"],"YES" if g["enabled"] else "NO"))
+
     def add_group(self):
         try:self.storage.add_group(self.gname.get(),self.gid.get());self.refresh_groups()
         except Exception as e:messagebox.showerror("Group",str(e))
+
     def set_selected_groups(self,enabled):
         for item in self.gtree.selection():
             self.storage.set_group_enabled(self.gtree.item(item)["values"][1],enabled)
         self.refresh_groups()
+
     def remove_group(self):
         for item in self.gtree.selection():
             self.storage.remove_group(self.gtree.item(item)["values"][1])
         self.refresh_groups()
+
     def load_groups(self):
         if not self.settings.signal_account:return messagebox.showwarning("Signal","Configure a Signal account first.")
         from .signal_client import SignalClient
@@ -163,6 +229,7 @@ class App(tk.Tk):
         except Exception as e:
             self.storage.log("ERROR",f"Signal group load failed: {e}")
             messagebox.showerror("Signal",str(e))
+
     def _view_scheduler(self):
         self._title("SCHEDULER")
         state="RUNNING" if self.scheduler and self.scheduler.running else "STOPPED"
@@ -179,9 +246,11 @@ class App(tk.Tk):
         tk.Button(buttons,text="START PREVIEW / DRY RUN",command=lambda:self.start_scheduler(False),bg=GREEN,fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="START REAL (AUTHORIZED)",command=lambda:self.start_scheduler(True),bg="#d6a900",fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
+
     def _reload_scheduler_view(self):
         if not self.winfo_exists():return
         self.after(0, lambda:self.show("scheduler") if self.winfo_exists() else None)
+
     def start_scheduler(self, real=False):
         if self.scheduler and self.scheduler.running:return
         if not getattr(self,"pack_map",{}):return messagebox.showwarning("Scheduler","Save a pack first.")
@@ -209,9 +278,11 @@ class App(tk.Tk):
             self.storage.log("ERROR",f"Scheduler start failed: {e}")
             self.scheduler=None
             messagebox.showerror("Scheduler",str(e))
+
     def stop_scheduler(self):
         if self.scheduler:self.scheduler.stop();self.storage.log("INFO","Scheduler stopped")
         self.show("scheduler")
+
     def _view_settings(self):
         self._title("SETTINGS")
         f=tk.Frame(self.content,bg=BG);f.pack(anchor="w")
@@ -221,6 +292,7 @@ class App(tk.Tk):
             tk.Label(f,text=label,bg=BG,fg=WHITE).grid(row=r,column=0,sticky="w",pady=5);e=tk.Entry(f,width=60);e.insert(0,str(val));e.grid(row=r,column=1,pady=5);self.svars[k]=e
         self.sig=tk.BooleanVar(value=self.settings.signal_enabled);tk.Checkbutton(f,text="Signal enabled",variable=self.sig,bg=BG,fg=WHITE,selectcolor=PANEL).grid(row=5,column=1,sticky="w")
         tk.Button(f,text="SAVE SETTINGS",command=self.save_settings,bg=GREEN,fg=BG).grid(row=6,column=1,sticky="w",pady=10)
+
     def save_settings(self):
         try:
             values={"variation_count":int(self.svars["variation_count"].get()),"interval_minutes":int(self.svars["interval_minutes"].get()),"cycle_hours":int(self.svars["cycle_hours"].get()),"signal_account":self.svars["signal_account"].get().strip(),"signal_cli_path":self.svars["signal_cli_path"].get().strip(),"signal_enabled":self.sig.get()}
@@ -228,9 +300,12 @@ class App(tk.Tk):
             if self.scheduler and self.scheduler.running:raise ValueError("Stop the scheduler before changing scheduler settings.")
             self.settings=Settings(**values);self.storage.set_settings(values);self.storage.log("INFO","Settings saved");messagebox.showinfo("Settings","Settings saved and will be used by the next scheduler start.")
         except Exception as e:messagebox.showerror("Settings",str(e))
+
     def _view_logs(self):
         self._title("LOGS")
         box=tk.Text(self.content,bg="#09100d",fg=WHITE);box.pack(fill="both",expand=True)
         for r in reversed(self.storage.get_logs(500)):box.insert("end",f"{r['created_at']} | {r['level']} | {r['message']}\n")
+
 def main():App().mainloop()
+
 if __name__=="__main__":main()
