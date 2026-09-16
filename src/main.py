@@ -64,11 +64,11 @@ def build_sender(settings: Settings):
             "SIGNAL_ACCOUNT is required when SIGNAL_ENABLED=true."
         )
 
-    groups = load_enabled_groups()
-
     client = SignalClient(account=settings.signal_account)
 
     def send(message: str) -> None:
+        groups = load_enabled_groups()
+
         sent = 0
 
         for group in groups:
@@ -84,8 +84,8 @@ def build_sender(settings: Settings):
         )
 
     logger.info(
-        "Signal sending is ENABLED for %d database groups.",
-        len(groups),
+        "Signal sending is ENABLED; groups will be loaded "
+        "from SQLite for each delivery.",
     )
 
     return send
