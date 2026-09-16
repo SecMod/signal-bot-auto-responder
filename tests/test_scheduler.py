@@ -43,3 +43,15 @@ def test_scheduler_rejects_invalid_interval():
         return
 
     assert False
+
+
+def test_scheduler_stop_sets_running_false():
+    scheduler = Scheduler(
+        messages=["First"],
+        interval_minutes=15,
+    )
+
+    scheduler.running = True
+    scheduler.stop()
+
+    assert scheduler.running is False
