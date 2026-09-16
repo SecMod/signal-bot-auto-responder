@@ -121,7 +121,6 @@ class App(tk.Tk):
         for item in self.gtree.selection():
             self.storage.set_group_enabled(self.gtree.item(item)["values"][1],enabled)
         self.refresh_groups()
-
     def remove_group(self):
         for item in self.gtree.selection():
             self.storage.remove_group(self.gtree.item(item)["values"][1])
@@ -134,15 +133,12 @@ class App(tk.Tk):
             existing={g["group_id"] for g in self.storage.get_groups()}
             added=0
             for g in groups:
-                if g["group_id"] in existing:
-                    continue
+                if g["group_id"] in existing:continue
                 try:
                     self.storage.add_group(g["name"],g["group_id"],enabled=False)
                     added += 1
                     existing.add(g["group_id"])
                 except Exception:
-                    # A name collision must not prevent the remaining Signal
-                    # groups from being imported.
                     continue
             self.storage.log("INFO",f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.")
             self.refresh_groups()
