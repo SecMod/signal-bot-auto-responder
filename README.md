@@ -39,3 +39,16 @@ The project does **not** implement unattended Signal posting, CAPTCHA solving, a
 - `src/signal_client.py` — transport boundary
 - `tests/` — automated tests
 - `systemd/` — service template
+## CLI
+
+Run the review-mode CLI directly with PowerShell:
+
+```powershell
+python -m src.cli
+```
+
+It generates exactly 24 reviewable variations and does not send messages.
+
+## Verification
+
+GitHub Actions runs compile checks and the full pytest suite on Python 3.11, 3.12 and 3.13.
