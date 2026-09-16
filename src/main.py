@@ -48,24 +48,28 @@ def build_sender(settings: Settings):
             "SIGNAL_ACCOUNT is required when SIGNAL_ENABLED=true."
         )
 
-    if not settings.signal_group_id:
+    if not settings.signal_group_ids:
         raise ValueError(
-            "SIGNAL_GROUP_ID is required when SIGNAL_ENABLED=true."
+            "SIGNAL_GROUP_IDS is required when SIGNAL_ENABLED=true."
         )
 
     client = SignalClient(account=settings.signal_account)
 
     def send(message: str) -> None:
-        client.send_to_group(
-            settings.signal_group_id,
-            message,
-        )
-        logger.info("Signal message sent successfully.")
+        for group_id in settings.signal_group_ids:
+            client.send_to_group(group_id, message)
 
-    logger.info("Signal sending is ENABLED.")
+        logger.info(
+            "Signal message sent successfully to %d groups.",
+            len(settings.signal_group_ids),
+        )
+
+    logger.info(
+        "Signal sending is ENABLED for %d groups.",
+        len(settings.signal_group_ids),
+    )
 
     return send
-
 
 def main() -> None:
     settings = Settings.from_env()

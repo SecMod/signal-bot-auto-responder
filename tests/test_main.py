@@ -16,7 +16,7 @@ def test_build_sender_requires_account_when_enabled():
     settings = Settings(
         signal_enabled=True,
         signal_account="",
-        signal_group_id="group-test",
+        signal_group_ids=("group-test",),
     )
 
     try:
@@ -32,13 +32,13 @@ def test_build_sender_requires_group_when_enabled():
     settings = Settings(
         signal_enabled=True,
         signal_account="+123456789",
-        signal_group_id="",
+        signal_group_ids=(),
     )
 
     try:
         build_sender(settings)
     except ValueError as exc:
-        assert "SIGNAL_GROUP_ID" in str(exc)
+        assert "SIGNAL_GROUP_IDS" in str(exc)
         return
 
     assert False
