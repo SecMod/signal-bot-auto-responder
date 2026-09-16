@@ -1,52 +1,17 @@
-﻿"""Signal CLI transport adapter.
-
-Requires signal-cli to be installed and configured separately.
-This module does not automate the Signal desktop UI or bypass
-verification / anti-abuse challenges.
-"""
-
 from __future__ import annotations
-
 import subprocess
 from dataclasses import dataclass
-
 
 @dataclass
 class SignalClient:
     account: str
-    signal_cli: str = (
-        r"C:\Users\prakh\signal-cli\signal-cli-0.14.8\bin\signal-cli.bat"
-    )
-
-    def send_to_group(self, group_id: str, message: str) -> None:
-        """Send an approved message to a configured Signal group."""
-        if not group_id.strip():
-            raise ValueError("group_id cannot be empty.")
-
-        if not message.strip():
-            raise ValueError("message cannot be empty.")
-
-        if not self.signal_cli.strip():
-            raise ValueError("SIGNAL_CLI_PATH cannot be empty.")
-
-        command = [
-            self.signal_cli,
-            "-a",
-            self.account,
-            "send",
-            "-g",
-            group_id,
-            "-m",
-            message,
-        ]
-
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            error = result.stderr.strip() or "Unknown signal-cli error"
-            raise RuntimeError(f"signal-cli failed: {error}")
+    signal_cli: str = "signal-cli"
+    def _run(self,*args):
+        r=subprocess.run([self.signal_cli,"-a",self.account,*args],capture_output=True,text=True,check=False)
+        if r.returncode: raise RuntimeError(r.stderr.strip() or "signal-cli failed")
+        return r.stdout
+    def list_groups(self):
+        return self._run("listGroups","--detailed")
+    def send_to_group(self,group_id,message):
+        if not group_id.strip() or not message.strip(): raise ValueError("group_id and message are required")
+        return self._run("send","-g",group_id,"-m",message)
