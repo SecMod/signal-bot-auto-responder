@@ -6,6 +6,7 @@ import logging
 
 from .config import Settings
 from .scheduler import Scheduler
+from .signal_client import SignalClient
 from .storage import Storage
 
 
@@ -36,6 +37,36 @@ def dry_run_send(message: str) -> None:
     logger.info("DRY RUN → %s", message)
 
 
+def build_sender(settings: Settings):
+    """Build the configured message sender."""
+    if not settings.signal_enabled:
+        logger.info("Signal sending is DISABLED; using dry-run mode.")
+        return dry_run_send
+
+    if not settings.signal_account:
+        raise ValueError(
+            "SIGNAL_ACCOUNT is required when SIGNAL_ENABLED=true."
+        )
+
+    if not settings.signal_group_id:
+        raise ValueError(
+            "SIGNAL_GROUP_ID is required when SIGNAL_ENABLED=true."
+        )
+
+    client = SignalClient(account=settings.signal_account)
+
+    def send(message: str) -> None:
+        client.send_to_group(
+            settings.signal_group_id,
+            message,
+        )
+        logger.info("Signal message sent successfully.")
+
+    logger.info("Signal sending is ENABLED.")
+
+    return send
+
+
 def main() -> None:
     settings = Settings.from_env()
     messages = load_messages()
@@ -51,14 +82,20 @@ def main() -> None:
         interval_minutes=settings.interval_minutes,
     )
 
-    logger.info("Loaded %d approved message variations.", len(messages))
+    sender = build_sender(settings)
+
+    logger.info(
+        "Loaded %d approved message variations.",
+        len(messages),
+    )
+
     logger.info(
         "Cycle: %d hours | Interval: %d minutes",
         settings.cycle_hours,
         settings.interval_minutes,
     )
 
-    scheduler.run_forever(dry_run_send)
+    scheduler.run_forever(sender)
 
 
 if __name__ == "__main__":
