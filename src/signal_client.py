@@ -34,7 +34,19 @@ class SignalClient:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "signal-cli failed")
         return result.stdout
 
+    def refresh(self) -> None:
+        """Process pending Signal events/storage sync before querying groups."""
+        self._run("receive", "--timeout", "1")
+
     def list_groups(self) -> list[dict[str, Any]]:
+        # A linked signal-cli account can learn about newly created groups
+        # through pending storage-sync events. Process those first.
+        try:
+            self.refresh()
+        except RuntimeError:
+            # Group listing should still work if there were no pending events
+            # or receive is unavailable for this account mode.
+            pass
         raw = self._run("--output", "json", "listGroups")
         try:
             data = json.loads(raw)
