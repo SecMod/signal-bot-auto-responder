@@ -92,6 +92,7 @@ class Storage:
 
     def delete_pack(self, pid: int):
         with self._lock:
+            self.db.execute("DELETE FROM variations WHERE pack_id=?", (pid,))
             self.db.execute("DELETE FROM packs WHERE id=?", (pid,))
             self.db.commit()
 
