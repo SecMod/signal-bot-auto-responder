@@ -60,3 +60,5 @@ cd "C:\Users\prakh\OneDrive\Documents\GitHub\signal-bot-auto-responder"
 python run_gui.py
 python run_cli.py
 ```
+
+<!-- final CI verification -->
