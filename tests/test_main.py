@@ -31,3 +31,5 @@ def test_preview_sender_uses_storage(tmp_path):
     sender = build_preview_sender(storage)
     sender("Hello")
     assert storage.get_logs()[0]["message"] == "PREVIEW: Hello"
+
+# CI verification marker
