@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from typing import Any
@@ -13,12 +14,24 @@ class SignalClient:
     def _run(self, *args: str) -> str:
         if not self.account.strip():
             raise ValueError("Signal account is required.")
-        result = subprocess.run(
-            [self.signal_cli, "-a", self.account, *args],
-            capture_output=True, text=True, check=False,
-        )
+        cli=self.signal_cli.strip()
+        if not cli:
+            raise ValueError("signal-cli path is required.")
+        if os.path.sep in cli or "/" in cli:
+            if not os.path.exists(cli):
+                raise FileNotFoundError(f"signal-cli executable not found: {cli}")
+        command=[cli, "-a", self.account, *args]
+        try:
+            result=subprocess.run(
+                command, capture_output=True, text=True, check=False,
+                shell=cli.lower().endswith((".bat",".cmd")),
+            )
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Could not start signal-cli: {cli}. Check Settings → signal-cli path."
+            ) from exc
         if result.returncode:
-            raise RuntimeError(result.stderr.strip() or "signal-cli failed")
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "signal-cli failed")
         return result.stdout
 
     def list_groups(self) -> list[dict[str, Any]]:
