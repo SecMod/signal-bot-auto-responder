@@ -1,3 +1,6 @@
+import time
+
+
 def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     from src.storage import Storage
     from src.gui import App
@@ -25,6 +28,7 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     class FakeClient:
         def __init__(self, account, signal_cli="signal-cli"):
             self.account = account
+
         def list_groups(self):
             return [
                 {"name": "Imported A", "group_id": "import-a"},
@@ -49,6 +53,11 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     app.show("scheduler")
     app.start_scheduler()
     assert app.scheduler is not None
+    for _ in range(50):
+        if not app.scheduler.running:
+            break
+        time.sleep(0.01)
     app.stop_scheduler()
+    assert any("DRY RUN scheduled message" in row["message"] for row in app.storage.get_logs())
 
     app.destroy()
