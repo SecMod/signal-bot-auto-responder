@@ -64,7 +64,9 @@ def build_sender(settings: Settings):
             "SIGNAL_ACCOUNT is required when SIGNAL_ENABLED=true."
         )
 
-    client = SignalClient(account=settings.signal_account)
+    client = SignalClient(
+        account=settings.signal_account,
+    )
 
     def send(message: str) -> None:
         groups = load_enabled_groups()

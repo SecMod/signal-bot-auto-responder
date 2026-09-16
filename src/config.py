@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 
@@ -13,15 +14,18 @@ class Settings:
     cycle_hours: int = 6
     signal_account: str = ""
     signal_enabled: bool = False
+    signal_cli_path: str = ""
 
     @classmethod
     def from_env(cls) -> "Settings":
         interval_minutes = int(
             os.getenv("MESSAGE_INTERVAL_MINUTES", "15")
         )
+
         variation_count = int(
             os.getenv("VARIATION_COUNT", "24")
         )
+
         cycle_hours = int(
             os.getenv("CYCLE_HOURS", "6")
         )
@@ -49,10 +53,15 @@ class Settings:
             "SIGNAL_ENABLED", "false"
         ).strip().lower() == "true"
 
+        signal_cli_path = os.getenv(
+            "SIGNAL_CLI_PATH", ""
+        ).strip()
+
         return cls(
             interval_minutes=interval_minutes,
             variation_count=variation_count,
             cycle_hours=cycle_hours,
             signal_account=signal_account,
             signal_enabled=signal_enabled,
+            signal_cli_path=signal_cli_path,
         )

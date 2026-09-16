@@ -14,7 +14,9 @@ from dataclasses import dataclass
 @dataclass
 class SignalClient:
     account: str
-    signal_cli: str = r"C:\Users\prakh\signal-cli\signal-cli-0.14.8\bin\signal-cli.bat"
+    signal_cli: str = (
+        r"C:\Users\prakh\signal-cli\signal-cli-0.14.8\bin\signal-cli.bat"
+    )
 
     def send_to_group(self, group_id: str, message: str) -> None:
         """Send an approved message to a configured Signal group."""
@@ -23,6 +25,9 @@ class SignalClient:
 
         if not message.strip():
             raise ValueError("message cannot be empty.")
+
+        if not self.signal_cli.strip():
+            raise ValueError("SIGNAL_CLI_PATH cannot be empty.")
 
         command = [
             self.signal_cli,
