@@ -130,9 +130,19 @@ class App(tk.Tk):
         if not self.settings.signal_account:return messagebox.showwarning("Signal","Configure a Signal account first.")
         from .signal_client import SignalClient
         try:
-            out=SignalClient(self.settings.signal_account,self.settings.signal_cli_path or "signal-cli").list_groups()
-            messagebox.showinfo("Signal groups","Returned groups. Review and add only authorized groups.\n\n"+out[:6000])
-        except Exception as e:messagebox.showerror("Signal",str(e))
+            groups=SignalClient(self.settings.signal_account,self.settings.signal_cli_path or "signal-cli").list_groups()
+            existing={g["group_id"] for g in self.storage.get_groups()}
+            added=0
+            for g in groups:
+                if g["group_id"] not in existing:
+                    self.storage.add_group(g["name"],g["group_id"],enabled=False)
+                    added+=1
+            self.storage.log("INFO",f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.")
+            self.refresh_groups()
+            messagebox.showinfo("Signal groups",f"Loaded {len(groups)} groups. {added} new groups were added as DISABLED. Enable only authorized groups.")
+        except Exception as e:
+            self.storage.log("ERROR",f"Signal group load failed: {e}")
+            messagebox.showerror("Signal",str(e))
     def _view_scheduler(self):
         self._title("SCHEDULER")
         state="RUNNING" if self.scheduler and self.scheduler.running else "STOPPED"
