@@ -21,6 +21,5 @@ jobs:
       - run: python -m compileall -q src run_gui.py run_cli.py
       - name: Install virtual display
         run: sudo apt-get update && sudo apt-get install -y xvfb
-      - run: xvfb-run -a python -m pytest -q
-      - name: GUI smoke test
-        run: xvfb-run -a python -m pytest -q tests/test_gui_smoke.py
+      - name: Run full test suite
+        run: xvfb-run -a python -m pytest -q
