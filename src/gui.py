@@ -107,7 +107,9 @@ class App(tk.Tk):
         self.gtree=ttk.Treeview(self.content,columns=("name","id","enabled"),show="headings")
         for c in self.gtree["columns"]:self.gtree.heading(c,text=c.upper())
         self.gtree.pack(fill="both",expand=True,pady=8);self.refresh_groups()
-        tk.Button(self.content,text="REMOVE SELECTED",command=self.remove_group,bg=RED,fg=BG).pack(anchor="e")
+        tk.Button(self.content,text="ENABLE SELECTED",command=lambda:self.set_selected_groups(True),bg=GREEN,fg=BG).pack(side="left",padx=3)
+        tk.Button(self.content,text="DISABLE SELECTED",command=lambda:self.set_selected_groups(False),bg="#d6a900",fg=BG).pack(side="left",padx=3)
+        tk.Button(self.content,text="REMOVE SELECTED",command=self.remove_group,bg=RED,fg=BG).pack(side="right")
     def refresh_groups(self):
         if not hasattr(self,"gtree"):return
         for i in self.gtree.get_children():self.gtree.delete(i)
@@ -115,9 +117,15 @@ class App(tk.Tk):
     def add_group(self):
         try:self.storage.add_group(self.gname.get(),self.gid.get());self.refresh_groups()
         except Exception as e:messagebox.showerror("Group",str(e))
+    def set_selected_groups(self,enabled):
+        for item in self.gtree.selection():
+            self.storage.set_group_enabled(self.gtree.item(item)["values"][1],enabled)
+        self.refresh_groups()
+
     def remove_group(self):
-        s=self.gtree.selection()
-        if s:self.storage.remove_group(self.gtree.item(s[0])["values"][1]);self.refresh_groups()
+        for item in self.gtree.selection():
+            self.storage.remove_group(self.gtree.item(item)["values"][1])
+        self.refresh_groups()
     def load_groups(self):
         if not self.settings.signal_account:return messagebox.showwarning("Signal","Configure a Signal account first.")
         from .signal_client import SignalClient
