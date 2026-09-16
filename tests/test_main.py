@@ -16,7 +16,6 @@ def test_build_sender_requires_account_when_enabled():
     settings = Settings(
         signal_enabled=True,
         signal_account="",
-        signal_group_ids=(),
     )
 
     try:
@@ -44,7 +43,6 @@ def test_build_sender_requires_enabled_database_group_when_enabled(
     settings = Settings(
         signal_enabled=True,
         signal_account="+123456789",
-        signal_group_ids=(),
     )
 
     try:
