@@ -38,3 +38,12 @@ class SignalClient:
             if gid:
                 groups.append({"name": name, "group_id": gid})
         return groups
+
+    def send_to_group(self, group_id: str, message: str) -> None:
+        group_id = group_id.strip()
+        message = message.strip()
+        if not group_id:
+            raise ValueError("Signal group ID is required.")
+        if not message:
+            raise ValueError("Message is required.")
+        self._run("send", "-g", group_id, "-m", message)
