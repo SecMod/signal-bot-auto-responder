@@ -16,14 +16,34 @@ def test_build_sender_is_preview_when_signal_disabled(tmp_path):
     assert "PREVIEW: Test" in storage.get_logs()[0]["message"]
 
 
-def test_build_sender_is_preview_when_signal_enabled(tmp_path):
+def test_build_sender_real_send(monkeypatch, tmp_path):
+    storage = Storage(str(tmp_path / "test.db"))
+    storage.add_group("Authorized", "gid-1", enabled=True)
+    settings = Settings(signal_enabled=True, signal_account="+123")
+    sent = []
+
+    class FakeClient:
+        def __init__(self, account, signal_cli="signal-cli"):
+            assert account == "+123"
+            self.signal_cli = signal_cli
+
+        def send_to_group(self, group_id, message):
+            sent.append((group_id, message))
+
+    monkeypatch.setattr("src.main.SignalClient", FakeClient, raising=False)
+    sender = build_sender(settings, storage)
+    sender("Test")
+    assert sent == [("gid-1", "Test")]
+    assert "REAL: sent approved message to 1 authorized group(s)." in storage.get_logs()[0]["message"]
+
+
+def test_build_sender_rejects_real_without_groups(tmp_path):
     storage = Storage(str(tmp_path / "test.db"))
     settings = Settings(signal_enabled=True, signal_account="+123")
     sender = build_sender(settings, storage)
-    sender("Test")
-    logs = storage.get_logs()
-    assert any("preview-only" in row["message"].lower() for row in logs)
-    assert any("PREVIEW: Test" in row["message"] for row in logs)
+    import pytest
+    with pytest.raises(ValueError, match="No enabled authorized Signal groups"):
+        sender("Test")
 
 
 def test_preview_sender_uses_storage(tmp_path):
