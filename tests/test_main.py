@@ -30,7 +30,8 @@ def test_build_sender_real_send(monkeypatch, tmp_path):
         def send_to_group(self, group_id, message):
             sent.append((group_id, message))
 
-    monkeypatch.setattr("src.main.SignalClient", FakeClient, raising=False)
+    import src.signal_client
+    monkeypatch.setattr(src.signal_client, "SignalClient", FakeClient)
     sender = build_sender(settings, storage)
     sender("Test")
     assert sent == [("gid-1", "Test")]
