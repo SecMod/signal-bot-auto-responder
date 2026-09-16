@@ -135,3 +135,21 @@ class Storage:
             }
             for row in rows
         ]
+
+    def get_latest_approved_variations(self) -> list[str]:
+        """Return the latest pack's approved variations in position order."""
+        rows = self.db.execute(
+            """
+            SELECT v.text
+            FROM variations AS v
+            JOIN packs AS p ON p.id = v.pack_id
+            WHERE p.id = (
+                SELECT MAX(id)
+                FROM packs
+            )
+            AND v.approved = 1
+            ORDER BY v.position
+            """
+        ).fetchall()
+
+        return [row[0] for row in rows]
