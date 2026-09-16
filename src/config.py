@@ -1,11 +1,10 @@
-﻿import os
-from dataclasses import dataclass
+from __future__ import annotations
 
+import os
+from dataclasses import dataclass
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 @dataclass(frozen=True)
 class Settings:
@@ -18,50 +17,19 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
-        interval_minutes = int(
-            os.getenv("MESSAGE_INTERVAL_MINUTES", "15")
-        )
-
-        variation_count = int(
-            os.getenv("VARIATION_COUNT", "24")
-        )
-
-        cycle_hours = int(
-            os.getenv("CYCLE_HOURS", "6")
-        )
-
-        if interval_minutes <= 0:
-            raise ValueError(
-                "MESSAGE_INTERVAL_MINUTES must be greater than zero."
-            )
-
-        if variation_count <= 0:
-            raise ValueError(
-                "VARIATION_COUNT must be greater than zero."
-            )
-
-        if cycle_hours <= 0:
-            raise ValueError(
-                "CYCLE_HOURS must be greater than zero."
-            )
-
-        signal_account = os.getenv(
-            "SIGNAL_ACCOUNT", ""
-        ).strip()
-
-        signal_enabled = os.getenv(
-            "SIGNAL_ENABLED", "false"
-        ).strip().lower() == "true"
-
-        signal_cli_path = os.getenv(
-            "SIGNAL_CLI_PATH", ""
-        ).strip()
-
+        def positive(name: str, default: str) -> int:
+            try:
+                value = int(os.getenv(name, default))
+            except ValueError as exc:
+                raise ValueError(f"{name} must be an integer.") from exc
+            if value <= 0:
+                raise ValueError(f"{name} must be greater than zero.")
+            return value
         return cls(
-            interval_minutes=interval_minutes,
-            variation_count=variation_count,
-            cycle_hours=cycle_hours,
-            signal_account=signal_account,
-            signal_enabled=signal_enabled,
-            signal_cli_path=signal_cli_path,
+            positive("MESSAGE_INTERVAL_MINUTES", "15"),
+            positive("VARIATION_COUNT", "24"),
+            positive("CYCLE_HOURS", "6"),
+            os.getenv("SIGNAL_ACCOUNT", "").strip(),
+            os.getenv("SIGNAL_ENABLED", "false").strip().lower() == "true",
+            os.getenv("SIGNAL_CLI_PATH", "").strip(),
         )
