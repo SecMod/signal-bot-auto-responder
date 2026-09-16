@@ -150,18 +150,38 @@ class App(tk.Tk):
         self._title("SCHEDULER")
         state="RUNNING" if self.scheduler and self.scheduler.running else "STOPPED"
         tk.Label(self.content,text=f"Status: {state}\nApproved messages: {self.settings.variation_count}\nInterval: {self.settings.interval_minutes} minutes\nCycle: {self.settings.cycle_hours} hours\nSignal enabled: {'YES' if self.settings.signal_enabled else 'NO'}",bg=BG,fg=WHITE,justify="left").pack(anchor="w",pady=10)
-        tk.Button(self.content,text="START PREVIEW / DRY RUN",command=self.start_scheduler,bg=GREEN,fg=BG).pack(side="left",padx=4)
-        tk.Button(self.content,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
-    def start_scheduler(self):
+        tk.Label(self.content,text="Pack to use:",bg=BG,fg=WHITE).pack(anchor="w")
+        self.pack_choice=tk.StringVar()
+        self.pack_combo=ttk.Combobox(self.content,textvariable=self.pack_choice,state="readonly",width=80)
+        pack_rows=self.storage.list_packs()
+        self.pack_map={f"#{p["id"]} | {p["source"][:70]}":p["id"] for p in pack_rows}
+        self.pack_combo["values"]=list(self.pack_map)
+        if self.pack_combo["values"]: self.pack_combo.current(0)
+        self.pack_combo.pack(anchor="w",pady=(2,10))
+        buttons=tk.Frame(self.content,bg=BG);buttons.pack(anchor="w")
+        tk.Button(buttons,text="START PREVIEW / DRY RUN",command=lambda:self.start_scheduler(False),bg=GREEN,fg=BG).pack(side="left",padx=4)
+        tk.Button(buttons,text="START REAL (AUTHORIZED)",command=lambda:self.start_scheduler(True),bg="#d6a900",fg=BG).pack(side="left",padx=4)
+        tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
+    def start_scheduler(self, real=False):
         if self.scheduler and self.scheduler.running:return
-        packs=self.storage.list_packs()
-        if not packs:return messagebox.showwarning("Scheduler","Save a pack first.")
-        p=self.storage.get_pack(packs[0]["id"]); msgs=[v["text"] for v in p["variations"] if v["approved"]][:self.settings.variation_count]
+        if not getattr(self,"pack_map",{}):return messagebox.showwarning("Scheduler","Save a pack first.")
+        pid=self.pack_map.get(self.pack_choice.get())
+        if not pid:return messagebox.showwarning("Scheduler","Select a saved pack first.")
+        p=self.storage.get_pack(pid)
+        msgs=[v["text"] for v in p["variations"] if v["approved"]][:self.settings.variation_count]
         if len(msgs)!=self.settings.variation_count:return messagebox.showwarning("Scheduler",f"Need {self.settings.variation_count} approved variations; pack has {len(msgs)}.")
+        if real:
+            if not self.settings.signal_enabled:return messagebox.showwarning("Signal","Enable Signal in Settings before starting real mode.")
+            if not self.settings.signal_account:return messagebox.showwarning("Signal","Set the Signal account before starting real mode.")
+            if not self.storage.get_groups(enabled_only=True):return messagebox.showwarning("Signal","Enable at least one authorized group before starting real mode.")
+            from .main import build_sender
+            process=build_sender(self.settings,self.storage); mode="real"
+        else:
+            process=lambda m:self.storage.log("INFO",f"PREVIEW: {m[:160]}"); mode="preview"
         from .scheduler import Scheduler
         self.scheduler=Scheduler(msgs,self.settings.interval_minutes,self.settings.cycle_hours)
-        self.scheduler.start(lambda m:self.storage.log("INFO",f"DRY RUN scheduled message: {m[:160]}"))
-        self.storage.log("INFO","Scheduler started (preview/dry-run)")
+        self.scheduler.start(process)
+        self.storage.log("INFO",f"Scheduler started ({mode}) using pack #{pid}")
         self.show("scheduler")
     def stop_scheduler(self):
         if self.scheduler:self.scheduler.stop();self.storage.log("INFO","Scheduler stopped")
