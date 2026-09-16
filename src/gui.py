@@ -134,9 +134,16 @@ class App(tk.Tk):
             existing={g["group_id"] for g in self.storage.get_groups()}
             added=0
             for g in groups:
-                if g["group_id"] not in existing:
+                if g["group_id"] in existing:
+                    continue
+                try:
                     self.storage.add_group(g["name"],g["group_id"],enabled=False)
-                    added+=1
+                    added += 1
+                    existing.add(g["group_id"])
+                except Exception:
+                    # A name collision must not prevent the remaining Signal
+                    # groups from being imported.
+                    continue
             self.storage.log("INFO",f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.")
             self.refresh_groups()
             messagebox.showinfo("Signal groups",f"Loaded {len(groups)} groups. {added} new groups were added as DISABLED. Enable only authorized groups.")
