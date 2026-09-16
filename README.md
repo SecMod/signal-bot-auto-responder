@@ -1,37 +1,41 @@
 # Signal Bot Auto Responder
 
-Linux project for preparing and scheduling **authorized, human-reviewed** Signal group content.
+Linux project for preparing and reviewing **authorized** Signal group content.
 
-## Current MVP
-- Python project structure
-- 15-minute scheduling model
-- 24 content slots
-- Daily message/content-pack workflow
-- Logging and tests
-- systemd template for the local application
-- Signal transport boundary kept separate from content preparation
+## V2 control panel
 
-## Important platform limitation
+The local Tkinter control panel now provides:
+- Daily message entry
+- Generate exactly 24 editorial variations
+- Review/edit each variation
+- Approve individual variations
+- Save approved packs to SQLite
+- Local status display
 
-Signal's current Terms of Service prohibit bulk messaging and auto-messaging. The project therefore does **not** implement unattended automatic posting to Signal, CAPTCHA solving, anti-bot bypasses, fingerprint spoofing, invisible-character tricks, or UI automation intended to evade platform controls.
-
-The current workflow prepares content for review. A human should perform the actual posting where permitted.
-
-## Daily workflow
-
-1. Enter the day's base message.
-2. Generate a 24-slot content pack.
-3. Review/edit the variants.
-4. Post approved content manually where permitted.
-5. Keep the scheduler available for reminders/logging rather than unattended Signal delivery.
-
-## Development
+Run it with:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pytest
-python -m src.cli
+python run_gui.py
 ```
 
-Configuration is available through `.env.example`.
+On Debian/Ubuntu, if Tkinter is missing, install the distribution package:
+
+```bash
+sudo apt install python3-tk
+```
+
+## Important platform limitation
+
+The project does **not** implement unattended Signal posting, CAPTCHA solving, anti-bot bypasses, fingerprint spoofing, invisible-character tricks, or UI automation intended to evade platform controls. The GUI prepares and stores content for human review.
+
+## Project layout
+
+- `src/daily_content.py` — 24-variation content generation
+- `src/gui.py` — local control panel
+- `src/storage.py` — SQLite persistence
+- `src/scheduler.py` — generic local scheduler
+- `src/signal_client.py` — transport boundary
+- `tests/` — automated tests
+- `systemd/` — service template
