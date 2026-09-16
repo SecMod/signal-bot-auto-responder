@@ -19,6 +19,9 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     app.save_pack()
     assert len(app.storage.list_packs()) == 1
 
+    app.show("packs")
+    assert app.storage.list_packs()[0]["approved_count"] == 24
+
     app.show("groups")
     app.gname.insert(0, "Authorized Group")
     app.gid.insert(0, "group-test")
@@ -51,13 +54,14 @@ def test_gui_end_to_end_smoke(tmp_path, monkeypatch):
     assert all(not g["enabled"] for g in groups if g["group_id"].startswith("import-"))
 
     app.show("scheduler")
-    app.start_scheduler()
+    assert app.pack_choice.get().startswith("#1 | ")
+    app.start_scheduler(False)
     assert app.scheduler is not None
     for _ in range(50):
         if not app.scheduler.running:
             break
         time.sleep(0.01)
     app.stop_scheduler()
-    assert any("DRY RUN scheduled message" in row["message"] for row in app.storage.get_logs())
+    assert any("PREVIEW:" in row["message"] for row in app.storage.get_logs())
 
     app.destroy()
