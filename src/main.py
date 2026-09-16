@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-import os
 
 from .config import Settings
 from .scheduler import Scheduler
+from .storage import Storage
 
 
 logging.basicConfig(
@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 
 def load_messages() -> list[str]:
-    """Load today's approved variations from data/messages.txt."""
-    path = os.getenv("MESSAGES_FILE", "data/messages.txt")
+    """Load the latest approved variations from SQLite."""
+    storage = Storage()
+    messages = storage.get_latest_approved_variations()
 
-    with open(path, "r", encoding="utf-8") as file:
-        messages = [
-            line.strip()
-            for line in file
-            if line.strip()
-        ]
+    if not messages:
+        raise ValueError(
+            "No approved message pack found. "
+            "Create and save an approved pack in the GUI first."
+        )
 
     return messages
 
@@ -51,7 +51,7 @@ def main() -> None:
         interval_minutes=settings.interval_minutes,
     )
 
-    logger.info("Loaded %d message variations.", len(messages))
+    logger.info("Loaded %d approved message variations.", len(messages))
     logger.info(
         "Cycle: %d hours | Interval: %d minutes",
         settings.cycle_hours,
