@@ -20,18 +20,27 @@ def build_preview_sender(storage: Storage | None = None):
 
 
 def build_sender(settings: Settings, storage: Storage | None = None):
-    """Build the application's safe scheduler processing boundary.
-
-    The application intentionally remains preview-only. Signal credentials and
-    group configuration may be stored for authorized group management, but
-    this scheduler callback never transmits messages.
-    """
+    """Build preview or explicitly enabled delivery to configured authorized groups."""
     storage = storage or Storage()
-    if settings.signal_enabled:
-        storage.log("INFO", "Signal account configured; scheduler remains preview-only.")
-    else:
-        storage.log("INFO", "Signal disabled; scheduler remains preview-only.")
-    return build_preview_sender(storage)
+    if not settings.signal_enabled:
+        return build_preview_sender(storage)
+    if not settings.signal_account:
+        raise ValueError("Signal account is required when Signal is enabled.")
+    from .signal_client import SignalClient
+    client = SignalClient(account=settings.signal_account, signal_cli=settings.signal_cli_path or "signal-cli")
+
+    def process(message: str) -> None:
+        groups = storage.get_groups(enabled_only=True)
+        if not groups:
+            raise ValueError("No enabled authorized Signal groups configured.")
+        sent = 0
+        for group in groups:
+            client.send_to_group(group["group_id"], message)
+            sent += 1
+        storage.log("INFO", f"REAL: sent approved message to {sent} authorized group(s).")
+
+    storage.log("INFO", "Signal real delivery enabled for configured authorized groups.")
+    return process
 
 
 def main() -> None:
