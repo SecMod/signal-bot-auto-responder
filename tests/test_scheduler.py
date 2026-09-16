@@ -25,3 +25,21 @@ def test_scheduler_starts_at_first_message():
     )
 
     assert scheduler.next_message() == "First"
+
+
+def test_scheduler_rejects_empty_messages():
+    try:
+        Scheduler(messages=[], interval_minutes=15)
+    except ValueError:
+        return
+
+    assert False
+
+
+def test_scheduler_rejects_invalid_interval():
+    try:
+        Scheduler(messages=["Message"], interval_minutes=0)
+    except ValueError:
+        return
+
+    assert False
