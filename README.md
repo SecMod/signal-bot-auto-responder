@@ -52,3 +52,11 @@ It generates exactly 24 reviewable variations and does not send messages.
 ## Verification
 
 GitHub Actions runs compile checks and the full pytest suite on Python 3.11, 3.12 and 3.13.
+
+### Windows PowerShell
+
+```powershell
+cd "C:\Users\prakh\OneDrive\Documents\GitHub\signal-bot-auto-responder"
+python run_gui.py
+python run_cli.py
+```
