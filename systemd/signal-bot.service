@@ -1,0 +1,15 @@
+[Unit]
+Description=Signal Bot Auto Responder
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/signal-bot-auto-responder
+ExecStart=%h/signal-bot-auto-responder/.venv/bin/python -m src.main
+Restart=on-failure
+RestartSec=10
+EnvironmentFile=-%h/signal-bot-auto-responder/.env
+
+[Install]
+WantedBy=default.target
