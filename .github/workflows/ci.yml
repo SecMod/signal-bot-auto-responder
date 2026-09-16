@@ -24,6 +24,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Compile source
-        run: python -m compileall -q src
+        run: python -m compileall -q src run_gui.py run_cli.py
       - name: Run tests
         run: python -m pytest -q
