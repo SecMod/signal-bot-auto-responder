@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import threading
 
 from .config import Settings
 from .daily_content import generate_variations
@@ -63,10 +64,16 @@ class App(tk.Tk):
             self.vars.append((v,box))
         tk.Button(self.review,text="SAVE APPROVED PACK",command=self.save_pack,bg=GREEN,fg=BG).pack(anchor="e",pady=6)
     def save_pack(self):
-        src=self.source.get("1.0","end").strip()
-        vals=[b.get("1.0","end").strip() for v,b in self.vars if v.get() and b.get("1.0","end").strip()]
-        if len(vals)!=24:return messagebox.showwarning("Approval","All 24 variations must be approved before saving.")
-        pid=self.storage.save_pack(src,vals); self.storage.log("INFO",f"Saved pack #{pid}"); messagebox.showinfo("Saved",f"Pack #{pid} saved.")
+        try:
+            src=self.source.get("1.0","end").strip()
+            vals=[b.get("1.0","end").strip() for v,b in self.vars if v.get() and b.get("1.0","end").strip()]
+            if len(vals)!=24:return messagebox.showwarning("Approval","All 24 variations must be approved before saving.")
+            pid=self.storage.save_pack(src,vals)
+            self.storage.log("INFO",f"Saved pack #{pid}")
+            messagebox.showinfo("Saved",f"Pack #{pid} saved.")
+        except Exception as e:
+            self.storage.log("ERROR",f"Pack save failed: {e}")
+            messagebox.showerror("Saved Pack",str(e))
     def _view_packs(self):
         self._title("SAVED PACKS")
         tree=ttk.Treeview(self.content,columns=("id","date","source","count","approved"),show="headings")
@@ -91,12 +98,22 @@ class App(tk.Tk):
             e=tk.Entry(row,bg="#09100d",fg=WHITE,insertbackground=GREEN);e.insert(0,v["text"]);e.pack(side="left",fill="x",expand=True,padx=5)
             edits.append((v["id"],a,e))
         def save():
-            for vid,a,e in edits:self.storage.set_variation(vid,e.get(),a.get())
-            self.storage.log("INFO",f"Updated pack #{p['id']}");self.show("packs")
+            try:
+                for vid,a,e in edits:self.storage.set_variation(vid,e.get(),a.get())
+                self.storage.log("INFO",f"Updated pack #{p['id']}");self.show("packs")
+            except Exception as e:messagebox.showerror("Pack",str(e))
         tk.Button(self.content,text="SAVE CHANGES",command=save,bg=GREEN,fg=BG).pack(anchor="e")
     def delete_pack(self,tree):
         s=tree.selection()
-        if s and messagebox.askyesno("Delete","Delete selected pack?"):self.storage.delete_pack(int(s[0]));self.show("packs")
+        if not s:return
+        if not messagebox.askyesno("Delete","Delete selected pack?"):return
+        try:
+            self.storage.delete_pack(int(s[0]))
+            self.storage.log("INFO",f"Deleted pack #{s[0]}")
+            self.show("packs")
+        except Exception as e:
+            self.storage.log("ERROR",f"Pack delete failed: {e}")
+            messagebox.showerror("Delete Pack",str(e))
     def _view_groups(self):
         self._title("AUTHORIZED SIGNAL GROUPS")
         f=tk.Frame(self.content,bg=BG);f.pack(fill="x",pady=8)
@@ -154,7 +171,7 @@ class App(tk.Tk):
         self.pack_choice=tk.StringVar()
         self.pack_combo=ttk.Combobox(self.content,textvariable=self.pack_choice,state="readonly",width=80)
         pack_rows=self.storage.list_packs()
-        self.pack_map={f"#{p["id"]} | {p["source"][:70]}":p["id"] for p in pack_rows}
+        self.pack_map={f'#{p["id"]} | {p["source"][:70]}':p["id"] for p in pack_rows}
         self.pack_combo["values"]=list(self.pack_map)
         if self.pack_combo["values"]: self.pack_combo.current(0)
         self.pack_combo.pack(anchor="w",pady=(2,10))
@@ -162,12 +179,16 @@ class App(tk.Tk):
         tk.Button(buttons,text="START PREVIEW / DRY RUN",command=lambda:self.start_scheduler(False),bg=GREEN,fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="START REAL (AUTHORIZED)",command=lambda:self.start_scheduler(True),bg="#d6a900",fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
+    def _reload_scheduler_view(self):
+        if not self.winfo_exists():return
+        self.after(0, lambda:self.show("scheduler") if self.winfo_exists() else None)
     def start_scheduler(self, real=False):
         if self.scheduler and self.scheduler.running:return
         if not getattr(self,"pack_map",{}):return messagebox.showwarning("Scheduler","Save a pack first.")
         pid=self.pack_map.get(self.pack_choice.get())
         if not pid:return messagebox.showwarning("Scheduler","Select a saved pack first.")
         p=self.storage.get_pack(pid)
+        if not p:return messagebox.showwarning("Scheduler","Selected pack no longer exists.")
         msgs=[v["text"] for v in p["variations"] if v["approved"]][:self.settings.variation_count]
         if len(msgs)!=self.settings.variation_count:return messagebox.showwarning("Scheduler",f"Need {self.settings.variation_count} approved variations; pack has {len(msgs)}.")
         if real:
@@ -180,9 +201,14 @@ class App(tk.Tk):
             process=lambda m:self.storage.log("INFO",f"PREVIEW: {m[:160]}"); mode="preview"
         from .scheduler import Scheduler
         self.scheduler=Scheduler(msgs,self.settings.interval_minutes,self.settings.cycle_hours)
-        self.scheduler.start(process)
-        self.storage.log("INFO",f"Scheduler started ({mode}) using pack #{pid}")
-        self.show("scheduler")
+        try:
+            self.scheduler.start(process)
+            self.storage.log("INFO",f"Scheduler started ({mode}) using pack #{pid}")
+            self.show("scheduler")
+        except Exception as e:
+            self.storage.log("ERROR",f"Scheduler start failed: {e}")
+            self.scheduler=None
+            messagebox.showerror("Scheduler",str(e))
     def stop_scheduler(self):
         if self.scheduler:self.scheduler.stop();self.storage.log("INFO","Scheduler stopped")
         self.show("scheduler")
