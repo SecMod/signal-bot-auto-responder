@@ -104,7 +104,7 @@ class App(tk.Tk):
         self.gname.grid(row=0,column=0);self.gid.grid(row=0,column=1,padx=5)
         tk.Button(f,text="ADD GROUP",command=self.add_group,bg=GREEN,fg=BG).grid(row=0,column=2)
         tk.Button(f,text="LOAD FROM SIGNAL ACCOUNT",command=self.load_groups,bg=PANEL2,fg=WHITE).grid(row=0,column=3,padx=5)
-        self.gtree=ttk.Treeview(self.content,columns=("name","id","enabled"),show="headings")
+        self.gtree=ttk.Treeview(self.content,columns=("name","id","enabled"),show="headings",selectmode="extended")
         for c in self.gtree["columns"]:self.gtree.heading(c,text=c.upper())
         self.gtree.pack(fill="both",expand=True,pady=8);self.refresh_groups()
         tk.Button(self.content,text="ENABLE SELECTED",command=lambda:self.set_selected_groups(True),bg=GREEN,fg=BG).pack(side="left",padx=3)
