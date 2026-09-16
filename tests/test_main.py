@@ -16,7 +16,7 @@ def test_build_sender_requires_account_when_enabled():
     settings = Settings(
         signal_enabled=True,
         signal_account="",
-        signal_group_ids=("group-test",),
+        signal_group_ids=(),
     )
 
     try:
@@ -28,7 +28,19 @@ def test_build_sender_requires_account_when_enabled():
     assert False
 
 
-def test_build_sender_requires_group_when_enabled():
+def test_build_sender_requires_enabled_database_group_when_enabled(
+    monkeypatch,
+):
+    class FakeStorage:
+        def get_groups(self, enabled_only=False):
+            assert enabled_only is True
+            return []
+
+    monkeypatch.setattr(
+        "src.main.Storage",
+        FakeStorage,
+    )
+
     settings = Settings(
         signal_enabled=True,
         signal_account="+123456789",
@@ -38,7 +50,7 @@ def test_build_sender_requires_group_when_enabled():
     try:
         build_sender(settings)
     except ValueError as exc:
-        assert "SIGNAL_GROUP_IDS" in str(exc)
+        assert "No enabled Signal groups" in str(exc)
         return
 
     assert False

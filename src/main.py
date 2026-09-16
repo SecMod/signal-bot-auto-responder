@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 
 from .config import Settings
 from .scheduler import Scheduler
@@ -32,6 +33,19 @@ def load_messages() -> list[str]:
     return messages
 
 
+def load_enabled_groups() -> list[dict]:
+    """Load enabled Signal groups from SQLite."""
+    storage = Storage()
+    groups = storage.get_groups(enabled_only=True)
+
+    if not groups:
+        raise ValueError(
+            "No enabled Signal groups found in the database."
+        )
+
+    return groups
+
+
 def dry_run_send(message: str) -> None:
     """Print the message instead of sending it."""
     logger.info("DRY RUN → %s", message)
@@ -40,7 +54,9 @@ def dry_run_send(message: str) -> None:
 def build_sender(settings: Settings):
     """Build the configured message sender."""
     if not settings.signal_enabled:
-        logger.info("Signal sending is DISABLED; using dry-run mode.")
+        logger.info(
+            "Signal sending is DISABLED; using dry-run mode."
+        )
         return dry_run_send
 
     if not settings.signal_account:
@@ -48,28 +64,32 @@ def build_sender(settings: Settings):
             "SIGNAL_ACCOUNT is required when SIGNAL_ENABLED=true."
         )
 
-    if not settings.signal_group_ids:
-        raise ValueError(
-            "SIGNAL_GROUP_IDS is required when SIGNAL_ENABLED=true."
-        )
+    groups = load_enabled_groups()
 
     client = SignalClient(account=settings.signal_account)
 
     def send(message: str) -> None:
-        for group_id in settings.signal_group_ids:
-            client.send_to_group(group_id, message)
+        sent = 0
+
+        for group in groups:
+            client.send_to_group(
+                group["group_id"],
+                message,
+            )
+            sent += 1
 
         logger.info(
             "Signal message sent successfully to %d groups.",
-            len(settings.signal_group_ids),
+            sent,
         )
 
     logger.info(
-        "Signal sending is ENABLED for %d groups.",
-        len(settings.signal_group_ids),
+        "Signal sending is ENABLED for %d database groups.",
+        len(groups),
     )
 
     return send
+
 
 def main() -> None:
     settings = Settings.from_env()
@@ -107,3 +127,6 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         logger.info("Application stopped by user.")
+    except Exception:
+        logger.exception("Application failed.")
+        sys.exit(1)
