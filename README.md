@@ -39,3 +39,6 @@ The project does **not** implement unattended Signal posting, CAPTCHA solving, a
 - `src/signal_client.py` — transport boundary
 - `tests/` — automated tests
 - `systemd/` — service template
+
+
+<!-- CI verification -->
