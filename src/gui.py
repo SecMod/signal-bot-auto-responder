@@ -181,13 +181,20 @@ class App(tk.Tk):
         self.gname=tk.Entry(f,width=25);self.gid=tk.Entry(f,width=45)
         self.gname.grid(row=0,column=0);self.gid.grid(row=0,column=1,padx=5)
         tk.Button(f,text="ADD GROUP",command=self.add_group,bg=GREEN,fg=BG).grid(row=0,column=2)
-        tk.Button(f,text="LOAD FROM SIGNAL ACCOUNT",command=self.load_groups,bg=PANEL2,fg=WHITE).grid(row=0,column=3,padx=5)
+        tk.Button(f,text="LOAD / REFRESH FROM SIGNAL",command=self.load_groups,bg=PANEL2,fg=WHITE).grid(row=0,column=3,padx=5)
+        tk.Label(self.content,text="Select groups below. Use the buttons to enable/disable them, or double-click a row to toggle.",bg=BG,fg=MUTED).pack(anchor="w")
         self.gtree=ttk.Treeview(self.content,columns=("name","id","enabled"),show="headings",selectmode="extended")
-        for c in self.gtree["columns"]:self.gtree.heading(c,text=c.upper())
-        self.gtree.pack(fill="both",expand=True,pady=8);self.refresh_groups()
-        tk.Button(self.content,text="ENABLE SELECTED",command=lambda:self.set_selected_groups(True),bg=GREEN,fg=BG).pack(side="left",padx=3)
-        tk.Button(self.content,text="DISABLE SELECTED",command=lambda:self.set_selected_groups(False),bg="#d6a900",fg=BG).pack(side="left",padx=3)
-        tk.Button(self.content,text="REMOVE SELECTED",command=self.remove_group,bg=RED,fg=BG).pack(side="right")
+        self.gtree.heading("name",text="GROUP NAME"); self.gtree.heading("id",text="GROUP ID"); self.gtree.heading("enabled",text="ENABLED")
+        self.gtree.column("name",width=300); self.gtree.column("id",width=520); self.gtree.column("enabled",width=110,anchor="center")
+        self.gtree.pack(fill="both",expand=True,pady=8)
+        self.gtree.bind("<Double-1>",lambda e:self.toggle_group())
+        self.refresh_groups()
+        buttons=tk.Frame(self.content,bg=BG); buttons.pack(fill="x")
+        tk.Button(buttons,text="ENABLE SELECTED",command=lambda:self.set_selected_groups(True),bg=GREEN,fg=BG).pack(side="left",padx=3)
+        tk.Button(buttons,text="DISABLE SELECTED",command=lambda:self.set_selected_groups(False),bg="#d6a900",fg=BG).pack(side="left",padx=3)
+        tk.Button(buttons,text="SELECT ALL",command=lambda:self.gtree.selection_set(self.gtree.get_children()),bg=PANEL2,fg=WHITE).pack(side="left",padx=3)
+        tk.Button(buttons,text="CLEAR SELECTION",command=lambda:self.gtree.selection_remove(self.gtree.selection()),bg=PANEL2,fg=WHITE).pack(side="left",padx=3)
+        tk.Button(buttons,text="REMOVE SELECTED",command=self.remove_group,bg=RED,fg=BG).pack(side="right")
 
     def refresh_groups(self):
         if not hasattr(self,"gtree"):return
@@ -199,9 +206,19 @@ class App(tk.Tk):
         except Exception as e:messagebox.showerror("Group",str(e))
 
     def set_selected_groups(self,enabled):
-        for item in self.gtree.selection():
-            self.storage.set_group_enabled(self.gtree.item(item)["values"][1],enabled)
+        selected=self.gtree.selection()
+        if not selected:return messagebox.showwarning("Groups","Select at least one group.")
+        for item in selected:
+            self.storage.set_group_enabled(str(self.gtree.item(item)["values"][1]),enabled)
         self.refresh_groups()
+
+    def toggle_group(self):
+        selected=self.gtree.selection()
+        if not selected:return
+        item=selected[0]; values=self.gtree.item(item)["values"]
+        self.storage.set_group_enabled(str(values[1]),str(values[2]).upper()!="YES")
+        self.refresh_groups()
+        if self.gtree.exists(item): self.gtree.selection_set(item)
 
     def remove_group(self):
         for item in self.gtree.selection():
