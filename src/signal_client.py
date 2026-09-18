@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +35,36 @@ class SignalClient:
         if result.returncode:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "signal-cli failed")
         return result.stdout
+
+    def link(self, device_name: str = "Signal Bot") -> subprocess.Popen:
+        """Start signal-cli device linking without an account argument."""
+        cli=self.signal_cli.strip()
+        if not cli:
+            raise ValueError("signal-cli path is required.")
+        if os.path.sep in cli or "/" in cli:
+            if not os.path.exists(cli):
+                raise FileNotFoundError(f"signal-cli executable not found: {cli}")
+        command=[cli,"link","-n",device_name]
+        try:
+            return subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                shell=cli.lower().endswith((".bat",".cmd")),
+                bufsize=1,
+            )
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Could not start signal-cli: {cli}. Check Settings → signal-cli path."
+            ) from exc
+
+    @staticmethod
+    def extract_link_uri(output: str) -> str | None:
+        match=re.search(r"sgnl://linkdevice\?[^\s\r\n]+",output)
+        return match.group(0).rstrip('"\'') if match else None
 
     def refresh(self) -> None:
         """Process pending Signal events/storage sync before querying groups."""
