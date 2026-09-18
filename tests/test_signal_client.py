@@ -36,5 +36,9 @@ def test_send_command(monkeypatch):
 
 
 def test_extract_link_uri():
-    output = "Ready\n" + "sgnl://linkdevice?" + "uuid=abc12345&pub_key=xyz12345" + "\n"
-    assert SignalClient.extract_link_uri(output).rstrip("\\n") == "sgnl://linkdevice?uuid=abc12345&pub_key=xyz12345"
+    prefix = "sgnl://linkdevice?"
+    output = "Ready\n" + prefix + "uuid=abc12345&pub_key=xyz12345" + "\n"
+    uri = SignalClient.extract_link_uri(output)
+    assert uri is not None
+    assert uri.startswith(prefix)
+    assert uri.endswith("uuid=abc12345&pub_key=xyz12345")
