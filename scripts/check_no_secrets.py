@@ -21,7 +21,7 @@ FORBIDDEN_PARTS = (
 )
 
 SENSITIVE_PATTERNS = (
-    re.compile(r"sgnl://linkdevice\?[^\s"']+"),
+    re.compile(r'sgnl://linkdevice\?uuid=[^\s"\'&]+&pub_key=[^\s"\']+'),
     re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |PRIVATE )?PRIVATE KEY-----"),
 )
 
