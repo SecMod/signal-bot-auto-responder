@@ -3,6 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
+import re
 
 from .config import Settings
 from .daily_content import generate_variations
@@ -23,6 +24,7 @@ class App(tk.Tk):
         self.settings=self._load_settings()
         self.scheduler=None
         self.vars=[]
+        self.link_process=None
         self.content=tk.Frame(self,bg=BG)
         self._build_nav()
         self.content.pack(fill="both",expand=True,padx=15,pady=15)
@@ -309,6 +311,64 @@ class App(tk.Tk):
             tk.Label(f,text=label,bg=BG,fg=WHITE).grid(row=r,column=0,sticky="w",pady=5);e=tk.Entry(f,width=60);e.insert(0,str(val));e.grid(row=r,column=1,pady=5);self.svars[k]=e
         self.sig=tk.BooleanVar(value=self.settings.signal_enabled);tk.Checkbutton(f,text="Signal enabled",variable=self.sig,bg=BG,fg=WHITE,selectcolor=PANEL).grid(row=5,column=1,sticky="w")
         tk.Button(f,text="SAVE SETTINGS",command=self.save_settings,bg=GREEN,fg=BG).grid(row=6,column=1,sticky="w",pady=10)
+        tk.Button(f,text="LINK SIGNAL ACCOUNT",command=self.link_signal_account,bg=PANEL2,fg=GREEN).grid(row=7,column=1,sticky="w",pady=(2,5))
+        tk.Label(f,text="Links this app as a secondary Signal device. Scan the QR code with Signal → Settings → Linked Devices.",bg=BG,fg=MUTED,wraplength=700,justify="left").grid(row=8,column=1,sticky="w")
+
+    def link_signal_account(self):
+        if self.link_process and self.link_process.poll() is None:
+            return messagebox.showwarning("Signal","A Signal linking session is already running.")
+        cli=self.svars["signal_cli_path"].get().strip() or self.settings.signal_cli_path or "signal-cli"
+        try:
+            from .signal_client import SignalClient
+            self.link_process=SignalClient("",cli).link("Signal Bot")
+        except Exception as e:
+            messagebox.showerror("Signal linking",str(e))
+            return
+        win=tk.Toplevel(self); win.title("Link Signal Account"); win.geometry("560x680"); win.configure(bg=BG)
+        tk.Label(win,text="LINK SIGNAL ACCOUNT",bg=BG,fg=GREEN,font=("Segoe UI",18,"bold")).pack(pady=(15,5))
+        tk.Label(win,text="Open Signal → Settings → Linked Devices → Link New Device, then scan this QR code.",bg=BG,fg=WHITE,wraplength=500,justify="center").pack(pady=5)
+        qr_label=tk.Label(win,bg=BG); qr_label.pack(pady=10)
+        status=tk.Label(win,text="Starting signal-cli…",bg=BG,fg=MUTED,wraplength=500,justify="center"); status.pack(pady=5)
+        output=tk.Text(win,height=7,bg="#09100d",fg=MUTED,wrap="word"); output.pack(fill="both",expand=True,padx=15,pady=10)
+        def append(text): output.insert("end",text); output.see("end")
+        def show_qr(uri):
+            try:
+                import qrcode
+                from PIL import ImageTk
+                img=qrcode.make(uri).convert("RGB"); img.thumbnail((420,420))
+                photo=ImageTk.PhotoImage(img); qr_label.configure(image=photo); qr_label.image=photo
+                status.configure(text="QR code ready. Scan it from Signal → Settings → Linked Devices.")
+            except Exception as e:
+                status.configure(text=f"QR generation failed: {e}"); append(f"\nLink URI: {uri}\n")
+        def reader():
+            collected=""; uri=None
+            try:
+                for line in self.link_process.stdout:
+                    collected += line; self.after(0,append,line)
+                    if uri is None:
+                        from .signal_client import SignalClient
+                        uri=SignalClient.extract_link_uri(collected)
+                        if uri: self.after(0,show_qr,uri)
+                rc=self.link_process.wait()
+                match=re.search(r"Associated with:\s*(\+\d+)",collected)
+                account=match.group(1) if match else None
+                def finished():
+                    if rc==0 and account:
+                        self.settings=Settings(self.settings.interval_minutes,self.settings.variation_count,self.settings.cycle_hours,account,True,cli)
+                        self.storage.set_settings({"signal_account":account,"signal_enabled":True,"signal_cli_path":cli})
+                        status.configure(text=f"Linked successfully as {account}.")
+                        self.storage.log("INFO",f"Signal account linked: {account}")
+                        self.svars["signal_account"].delete(0,"end"); self.svars["signal_account"].insert(0,account); self.sig.set(True)
+                    elif rc==0: status.configure(text="Linking completed, but signal-cli did not report the account number.")
+                    else: status.configure(text="Signal linking failed. See output below.")
+                self.after(0,finished)
+            except Exception as e:
+                self.after(0,lambda:status.configure(text=f"Linking error: {e}"))
+        threading.Thread(target=reader,daemon=True,name="signal-link").start()
+        def close():
+            if self.link_process and self.link_process.poll() is None: self.link_process.terminate()
+            win.destroy()
+        win.protocol("WM_DELETE_WINDOW",close)
 
     def save_settings(self):
         try:
