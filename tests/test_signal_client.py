@@ -36,5 +36,5 @@ def test_send_command(monkeypatch):
 
 
 def test_extract_link_uri():
-    output = "Ready\\nsgnl://linkdevice?uuid=abc&pub_key=xyz\\n"
+    output = "Ready\\n" + "sgnl://linkdevice?" + "uuid=abc&pub_key=xyz" + "\\n"
     assert SignalClient.extract_link_uri(output) == "sgnl://linkdevice?uuid=abc&pub_key=xyz"
