@@ -33,3 +33,8 @@ def test_send_command(monkeypatch):
     monkeypatch.setattr(subprocess,"run",fake_run)
     SignalClient("+123","signal-cli")._run("send","-g","gid","-m","hello")
     assert calls == [["signal-cli","-a","+123","send","-g","gid","-m","hello"]]
+
+
+def test_extract_link_uri():
+    output = "Ready\\nsgnl://linkdevice?uuid=abc&pub_key=xyz\\n"
+    assert SignalClient.extract_link_uri(output) == "sgnl://linkdevice?uuid=abc&pub_key=xyz"
