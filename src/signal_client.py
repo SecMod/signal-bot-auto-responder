@@ -96,11 +96,26 @@ class SignalClient:
                 groups.append({"name": name, "group_id": gid})
         return groups
 
-    def send_to_group(self, group_id: str, message: str) -> None:
+    def send_to_group(
+        self,
+        group_id: str,
+        message: str = "",
+        attachments: list[str] | None = None,
+    ) -> None:
         group_id = group_id.strip()
         message = message.strip()
+        attachments = [str(path).strip() for path in (attachments or []) if str(path).strip()]
         if not group_id:
             raise ValueError("Signal group ID is required.")
-        if not message:
-            raise ValueError("Message is required.")
-        self._run("send", "-g", group_id, "-m", message)
+        if not message and not attachments:
+            raise ValueError("Message or at least one attachment is required.")
+        for path in attachments:
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"Attachment not found: {path}")
+
+        args = ["send", "-g", group_id]
+        if message:
+            args.extend(["-m", message])
+        if attachments:
+            args.extend(["-a", *attachments])
+        self._run(*args)
