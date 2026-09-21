@@ -38,11 +38,11 @@ class SignalClient:
                 errors="replace",
                 check=False,
                 shell=cli.lower().endswith((".bat", ".cmd")),
-                timeout=30,
+                timeout=60,
             )
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError(
-                "signal-cli timed out after 30 seconds. "
+                "signal-cli timed out after 60 seconds. "
                 "Check for another signal-cli instance or a locked Signal data directory."
             ) from exc
         except FileNotFoundError as exc:
@@ -99,7 +99,7 @@ class SignalClient:
             )
 
         accounts = re.findall(
-            r"Number:\s*(\+\d+)",
+            r"Number:s*(+d+)",
             result.stdout,
         )
 
@@ -140,10 +140,11 @@ class SignalClient:
     @staticmethod
     def extract_link_uri(output: str) -> str | None:
         match = re.search(
-            r"sgnl://linkdevice\?[^\s\r\n]+",
+            r"sgnl://linkdevice?[^s
+]+",
             output,
         )
-        return match.group(0).rstrip('"\'') if match else None
+        return match.group(0).rstrip('"'') if match else None
 
     def refresh(self) -> None:
         """Process pending Signal events/storage sync before querying groups."""
@@ -231,4 +232,3 @@ class SignalClient:
             args.extend(["-a", *attachments])
 
         self._run(*args)
-
