@@ -19,15 +19,35 @@ def build_preview_sender(storage: Storage | None = None):
     return process
 
 
-def build_sender(settings: Settings, storage: Storage | None = None):
-    """Build preview or explicitly enabled delivery to configured authorized groups."""
+def build_sender(
+    settings: Settings,
+    storage: Storage | None = None,
+    attachments: list[str] | None = None,
+):
+    """Build explicitly enabled delivery to configured authorized groups."""
     storage = storage or Storage()
     if not settings.signal_enabled:
         return build_preview_sender(storage)
     if not settings.signal_account:
         raise ValueError("Signal account is required when Signal is enabled.")
+
+    attachments = [
+        str(path).strip()
+        for path in (attachments or [])
+        if str(path).strip()
+    ]
+    if len(attachments) > 3:
+        raise ValueError("A maximum of 3 media attachments is supported.")
+    for path in attachments:
+        import os
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Attachment not found: {path}")
+
     from .signal_client import SignalClient
-    client = SignalClient(account=settings.signal_account, signal_cli=settings.signal_cli_path or "signal-cli")
+    client = SignalClient(
+        account=settings.signal_account,
+        signal_cli=settings.signal_cli_path or "signal-cli",
+    )
 
     def process(message: str) -> None:
         groups = storage.get_groups(enabled_only=True)
@@ -35,11 +55,23 @@ def build_sender(settings: Settings, storage: Storage | None = None):
             raise ValueError("No enabled authorized Signal groups configured.")
         sent = 0
         for group in groups:
-            client.send_to_group(group["group_id"], message)
+            client.send_to_group(
+                group["group_id"],
+                message,
+                attachments=attachments,
+            )
             sent += 1
-        storage.log("INFO", f"REAL: sent approved message to {sent} authorized group(s).")
+        storage.log(
+            "INFO",
+            f"REAL: sent approved message with {len(attachments)} media file(s) "
+            f"to {sent} authorized group(s).",
+        )
 
-    storage.log("INFO", "Signal real delivery enabled for configured authorized groups.")
+    storage.log(
+        "INFO",
+        f"Signal real delivery enabled for configured authorized groups "
+        f"with {len(attachments)} media attachment(s).",
+    )
     return process
 
 
