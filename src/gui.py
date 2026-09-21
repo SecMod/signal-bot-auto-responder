@@ -267,8 +267,8 @@ class App(tk.Tk):
         tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
         tk.Button(
             buttons,
-            text="SEND IMAGE NOW",
-            command=self.send_image_now,
+            text="SEND MEDIA NOW",
+            command=self.send_media_now,
             bg=PANEL2,
             fg=GREEN,
         ).pack(side="left",padx=4)
@@ -309,7 +309,7 @@ class App(tk.Tk):
         if self.scheduler:self.scheduler.stop();self.storage.log("INFO","Scheduler stopped")
         self.show("scheduler")
 
-    def send_image_now(self):
+    def send_media_now(self):
         if not self.settings.signal_enabled:
             return messagebox.showwarning("Signal", "Enable Signal in Settings before sending.")
         if not self.settings.signal_account:
@@ -319,17 +319,39 @@ class App(tk.Tk):
             return messagebox.showwarning("Signal", "Enable at least one authorized group first.")
 
         paths = filedialog.askopenfilenames(
-            title="Select image(s) to send",
+            title="Select 1–3 images or videos to send",
             filetypes=[
+                ("Images and videos", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.mp4 *.mov *.webm *.avi *.mkv"),
                 ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
+                ("Video files", "*.mp4 *.mov *.webm *.avi *.mkv"),
                 ("All files", "*.*"),
             ],
         )
         if not paths:
             return
 
+        if len(paths) > 3:
+            return messagebox.showwarning(
+                "Signal media",
+                f"You selected {len(paths)} files. Select between 1 and 3 images/videos.",
+            )
+
+        allowed_extensions = {
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+            ".mp4", ".mov", ".webm", ".avi", ".mkv",
+        }
+        invalid = [
+            path for path in paths
+            if __import__("os").path.splitext(path)[1].lower() not in allowed_extensions
+        ]
+        if invalid:
+            return messagebox.showwarning(
+                "Signal media",
+                "Unsupported media type selected:\n" + "\n".join(invalid),
+            )
+
         caption = simpledialog.askstring(
-            "Image caption",
+            "Media caption",
             "Optional caption (leave blank for no caption):",
             parent=self,
         )
@@ -350,15 +372,15 @@ class App(tk.Tk):
                 )
             self.storage.log(
                 "INFO",
-                f"REAL: sent {len(paths)} image(s) to {len(groups)} authorized group(s).",
+                f"REAL: sent {len(paths)} media file(s) to {len(groups)} authorized group(s).",
             )
             messagebox.showinfo(
                 "Signal",
-                f"Sent {len(paths)} image(s) to {len(groups)} authorized group(s).",
+                f"Sent {len(paths)} media file(s) to {len(groups)} authorized group(s).",
             )
         except Exception as e:
-            self.storage.log("ERROR", f"Image send failed: {e}")
-            messagebox.showerror("Signal image send", str(e))
+            self.storage.log("ERROR", f"Media send failed: {e}")
+            messagebox.showerror("Signal media send", str(e))
 
     def _view_settings(self):
         self._title("SETTINGS")
