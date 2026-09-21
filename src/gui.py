@@ -426,7 +426,7 @@ class App(tk.Tk):
                 ("Cycle setting",f"{self.settings.cycle_hours} hours"),
                 ("Approved messages",str(self.settings.variation_count)),
                 ("Authorized groups",str(len(self.storage.get_groups(enabled_only=True)))),
-                ("Media per message",f"{len(self.scheduler_media_paths)} / 3"),
+                ("Selected media",f"{len(self.scheduler_media_paths)} / 3"),
                 ("Duplicate protection","OFF"),
             )
             config_note="Uses the scheduler settings saved in Settings without the Safe Mode limits."
@@ -442,10 +442,13 @@ class App(tk.Tk):
             col=tk.Frame(config_grid,bg=PANEL)
             col.grid(row=0,column=i,sticky="w",padx=(0,28))
             tk.Label(col,text=label,bg=PANEL,fg=MUTED).pack(anchor="w")
-            tk.Label(
+            value_label=tk.Label(
                 col,text=value,bg=PANEL,fg=WHITE,
                 font=("Segoe UI",10,"bold"),
-            ).pack(anchor="w",pady=(2,0))
+            )
+            value_label.pack(anchor="w",pady=(2,0))
+            if label=="Selected media":
+                self.config_media_value=value_label
 
         tk.Label(
             config_box,text=config_note,bg=PANEL,fg=MUTED,
@@ -689,6 +692,12 @@ class App(tk.Tk):
                 self.scheduler_media_paths=list(cleaned)
             if hasattr(self,"scheduler_media_label"):
                 self.scheduler_media_label.configure(text=self._scheduler_media_text())
+            # Refresh the dashboard configuration so the selected count is
+            # immediately reflected as 1/3, 2/3, or 3/3.
+            if hasattr(self,"config_media_value") and self.config_media_value.winfo_exists():
+                self.config_media_value.configure(
+                    text=f"{len(self.scheduler_media_paths)} / 3"
+                )
             self.storage.log(
                 "INFO",
                 f"Scheduled media selected: {len(self.scheduler_media_paths)} file(s).",
