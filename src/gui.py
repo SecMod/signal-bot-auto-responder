@@ -754,7 +754,7 @@ class App(tk.Tk):
         # Its enforcement layer is added separately; this selection does not alter
         # Signal delivery or attempt to evade platform anti-spam controls.
         selected_mode=self.scheduler_mode.get()
-        self.storage.set_setting("scheduler_mode",selected_mode)
+        self.storage.set_settings({"scheduler_mode": selected_mode})
         self.scheduler=Scheduler(
             msgs,
             self.settings.interval_minutes,
