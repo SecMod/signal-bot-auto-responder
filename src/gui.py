@@ -315,54 +315,139 @@ class App(tk.Tk):
         )
 
     def select_scheduler_media(self):
-        paths = filedialog.askopenfilenames(
-            parent=self,
-            title="Select 1–3 images or videos for the pack",
-            multiple=True,
-            filetypes=[
-                (
-                    "Images and videos",
-                    "*.png *.jpg *.jpeg *.gif *.webp *.bmp "
-                    "*.mp4 *.mov *.webm *.avi *.mkv",
-                ),
-                ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
-                ("Video files", "*.mp4 *.mov *.webm *.avi *.mkv"),
-                ("All files", "*.*"),
-            ],
-        )
-        # Some native Tk file dialogs can return a single string even when
-        # multi-selection is requested. Normalize it before processing.
-        if isinstance(paths, str):
-            paths = (paths,) if paths else ()
-        if not paths:
-            return
-        if len(paths) > 3:
-            return messagebox.showwarning(
-                "Scheduled media",
-                f"You selected {len(paths)} files. Select between 1 and 3 images/videos.",
-            )
+        # Use a dedicated 3-slot picker instead of relying on the native
+        # multi-select file dialog, which can behave differently across
+        # Linux/Tk desktop environments.
+        win=tk.Toplevel(self)
+        win.title("Select Scheduled Media (1–3)")
+        win.geometry("760x300")
+        win.configure(bg=BG)
+        win.transient(self)
+        win.grab_set()
+
+        tk.Label(
+            win,
+            text="SELECT SCHEDULED MEDIA (1–3)",
+            bg=BG,
+            fg=GREEN,
+            font=("Segoe UI",16,"bold"),
+        ).pack(pady=(15,5))
+        tk.Label(
+            win,
+            text="Choose up to 3 images/videos. Each slot can be selected separately.",
+            bg=BG,
+            fg=MUTED,
+        ).pack(pady=(0,10))
+
         allowed_extensions = {
             ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
             ".mp4", ".mov", ".webm", ".avi", ".mkv",
         }
-        invalid = [
-            path for path in paths
-            if os.path.splitext(path)[1].lower() not in allowed_extensions
-        ]
-        if invalid:
-            return messagebox.showwarning(
-                "Scheduled media",
-                "Unsupported media type selected:\n" + "\n".join(invalid),
+        selected=list(self.scheduler_media_paths)
+        rows=tk.Frame(win,bg=BG)
+        rows.pack(fill="x",padx=20)
+
+        row_labels=[]
+        def refresh_rows():
+            for i,label in enumerate(row_labels):
+                path=selected[i] if i < len(selected) else ""
+                label.configure(text=os.path.basename(path) if path else "— no media selected —")
+
+        def browse_slot(index):
+            path=filedialog.askopenfilename(
+                parent=win,
+                title=f"Select media {index+1} of 3",
+                filetypes=[
+                    ("Images and videos","*.png *.jpg *.jpeg *.gif *.webp *.bmp *.mp4 *.mov *.webm *.avi *.mkv"),
+                    ("Image files","*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
+                    ("Video files","*.mp4 *.mov *.webm *.avi *.mkv"),
+                    ("All files","*.*"),
+                ],
             )
-        # Keep the selected files in the exact order returned by the dialog
-        # and refresh the UI with all selected entries.
-        self.scheduler_media_paths = list(paths[:3])
-        if hasattr(self, "scheduler_media_label"):
-            self.scheduler_media_label.configure(text=self._scheduler_media_text())
-        self.storage.log(
-            "INFO",
-            f"Scheduled media selected: {len(self.scheduler_media_paths)} file(s).",
-        )
+            if not path:
+                return
+            if os.path.splitext(path)[1].lower() not in allowed_extensions:
+                return messagebox.showwarning(
+                    "Scheduled media",
+                    "Unsupported media type selected.",
+                    parent=win,
+                )
+            while len(selected) <= index:
+                selected.append("")
+            selected[index]=path
+            while selected and not selected[-1]:
+                selected.pop()
+            refresh_rows()
+
+        def remove_slot(index):
+            if index < len(selected):
+                selected.pop(index)
+            refresh_rows()
+
+        for i in range(3):
+            row=tk.Frame(rows,bg=BG)
+            row.pack(fill="x",pady=4)
+            tk.Label(row,text=f"{i+1}.",width=3,bg=BG,fg=GREEN).pack(side="left")
+            label=tk.Label(
+                row,
+                text="— no media selected —",
+                bg="#09100d",
+                fg=WHITE,
+                anchor="w",
+                padx=8,
+            )
+            label.pack(side="left",fill="x",expand=True,padx=5)
+            row_labels.append(label)
+            tk.Button(
+                row,
+                text="BROWSE",
+                command=lambda i=i:browse_slot(i),
+                bg=PANEL2,
+                fg=GREEN,
+            ).pack(side="left",padx=3)
+            tk.Button(
+                row,
+                text="REMOVE",
+                command=lambda i=i:remove_slot(i),
+                bg=PANEL2,
+                fg=WHITE,
+            ).pack(side="left",padx=3)
+
+        refresh_rows()
+
+        actions=tk.Frame(win,bg=BG)
+        actions.pack(fill="x",padx=20,pady=15)
+
+        def apply_selection():
+            cleaned=[p for p in selected if p]
+            if not cleaned:
+                self.scheduler_media_paths=[]
+            elif len(cleaned)<=3:
+                self.scheduler_media_paths=list(cleaned)
+            if hasattr(self,"scheduler_media_label"):
+                self.scheduler_media_label.configure(text=self._scheduler_media_text())
+            self.storage.log(
+                "INFO",
+                f"Scheduled media selected: {len(self.scheduler_media_paths)} file(s).",
+            )
+            win.destroy()
+
+        tk.Button(
+            actions,
+            text="CANCEL",
+            command=win.destroy,
+            bg=PANEL2,
+            fg=WHITE,
+            padx=12,
+        ).pack(side="right",padx=4)
+        tk.Button(
+            actions,
+            text="USE SELECTED MEDIA",
+            command=apply_selection,
+            bg=GREEN,
+            fg=BG,
+            padx=12,
+        ).pack(side="right",padx=4)
 
     def clear_scheduler_media(self):
         self.scheduler_media_paths = []
