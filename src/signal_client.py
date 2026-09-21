@@ -38,7 +38,13 @@ class SignalClient:
                 errors="replace",
                 check=False,
                 shell=cli.lower().endswith((".bat", ".cmd")),
+                timeout=30,
             )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                "signal-cli timed out after 30 seconds. "
+                "Check for another signal-cli instance or a locked Signal data directory."
+            ) from exc
         except FileNotFoundError as exc:
             raise FileNotFoundError(
                 f"Could not start signal-cli: {cli}. "
