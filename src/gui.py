@@ -403,24 +403,54 @@ class App(tk.Tk):
             bg=PANEL2,fg=WHITE,padx=12,
         ).pack(side="right",padx=3)
 
-        # Safe Mode information
-        safe_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=12)
-        safe_box.pack(fill="x",pady=8)
+        # Mode-specific configuration
+        config_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=12)
+        config_box.pack(fill="x",pady=8)
+
+        selected_mode=self.scheduler_mode.get()
+        if selected_mode=="safe":
+            config_title="SAFE MODE CONFIGURATION"
+            config_values=(
+                ("Minimum interval","60 min"),
+                ("Daily limit","8 / group / 24h"),
+                ("Duplicate cooldown","24 hours"),
+                ("Quiet hours","23:00 → 08:00"),
+                ("Uncertain actions","SKIP"),
+                ("Logging","ON"),
+            )
+            config_note="Conservative posting limits. Safe Mode enforcement is not yet active in the delivery layer."
+        else:
+            config_title="NORMAL MODE CONFIGURATION"
+            config_values=(
+                ("Interval",f"{self.settings.interval_minutes} min"),
+                ("Cycle setting",f"{self.settings.cycle_hours} hours"),
+                ("Approved messages",str(self.settings.variation_count)),
+                ("Authorized groups",str(len(self.storage.get_groups(enabled_only=True)))),
+                ("Media per message",f"{len(self.scheduler_media_paths)} / 3"),
+                ("Duplicate protection","OFF"),
+            )
+            config_note="Uses the scheduler settings saved in Settings without the Safe Mode limits."
+
         tk.Label(
-            safe_box,text="SAFE MODE",bg=PANEL,fg=MUTED,
+            config_box,text=config_title,bg=PANEL,fg=MUTED,
             font=("Segoe UI",9,"bold"),
         ).pack(anchor="w")
-        safe_grid=tk.Frame(safe_box,bg=PANEL); safe_grid.pack(fill="x",pady=(6,0))
-        safe_values=(
-            ("Minimum interval","60 min"),
-            ("Daily limit","8 / group / 24h"),
-            ("Duplicate cooldown","24 hours"),
-            ("Quiet hours","23:00 → 08:00"),
-        )
-        for i,(label,value) in enumerate(safe_values):
-            col=tk.Frame(safe_grid,bg=PANEL); col.grid(row=0,column=i,sticky="w",padx=(0,35))
+
+        config_grid=tk.Frame(config_box,bg=PANEL)
+        config_grid.pack(fill="x",pady=(7,0))
+        for i,(label,value) in enumerate(config_values):
+            col=tk.Frame(config_grid,bg=PANEL)
+            col.grid(row=0,column=i,sticky="w",padx=(0,28))
             tk.Label(col,text=label,bg=PANEL,fg=MUTED).pack(anchor="w")
-            tk.Label(col,text=value,bg=PANEL,fg=WHITE,font=("Segoe UI",10,"bold")).pack(anchor="w",pady=(2,0))
+            tk.Label(
+                col,text=value,bg=PANEL,fg=WHITE,
+                font=("Segoe UI",10,"bold"),
+            ).pack(anchor="w",pady=(2,0))
+
+        tk.Label(
+            config_box,text=config_note,bg=PANEL,fg=MUTED,
+            wraplength=1050,justify="left",
+        ).pack(anchor="w",pady=(8,0))
 
         # Authorized groups
         groups=self.storage.get_groups(enabled_only=True)
