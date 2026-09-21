@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import threading
 from datetime import datetime
 from collections.abc import Callable, Sequence
@@ -36,6 +37,14 @@ class Scheduler:
         self.on_state_change = on_state_change
         self.on_post = on_post
         self.on_error = on_error
+
+    @property
+    def max_messages_per_cycle(self) -> int:
+        """Legacy capacity calculation retained for compatibility.
+
+        The 24/7 scheduler no longer stops at this value; it runs until STOP.
+        """
+        return max(1, math.ceil((self.cycle_hours * 60) / self.interval_minutes))
 
     def next_message(self) -> str:
         with self._lock:
