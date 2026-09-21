@@ -26,6 +26,7 @@ class App(tk.Tk):
         self.scheduler=None
         self.vars=[]
         self.link_process=None
+        self.scheduler_media_paths=[]
         self.content=tk.Frame(self,bg=BG)
         self._build_nav()
         self.content.pack(fill="both",expand=True,padx=15,pady=15)
@@ -268,15 +269,93 @@ class App(tk.Tk):
         tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
         tk.Button(
             buttons,
+            text="SELECT MEDIA (1–3)",
+            command=self.select_scheduler_media,
+            bg=PANEL2,
+            fg=GREEN,
+        ).pack(side="left",padx=4)
+        tk.Button(
+            buttons,
+            text="CLEAR MEDIA",
+            command=self.clear_scheduler_media,
+            bg=PANEL2,
+            fg=WHITE,
+        ).pack(side="left",padx=4)
+        tk.Button(
+            buttons,
             text="SEND MEDIA NOW",
             command=self.send_media_now,
             bg=PANEL2,
             fg=GREEN,
         ).pack(side="left",padx=4)
+        self.scheduler_media_label=tk.Label(
+            self.content,
+            text=self._scheduler_media_text(),
+            bg=BG,
+            fg=MUTED,
+            justify="left",
+            wraplength=1000,
+        )
+        self.scheduler_media_label.pack(anchor="w",pady=(8,4))
 
     def _reload_scheduler_view(self):
         if not self.winfo_exists():return
         self.after(0, lambda:self.show("scheduler") if self.winfo_exists() else None)
+
+    def _scheduler_media_text(self):
+        if not self.scheduler_media_paths:
+            return "Scheduled media: NONE — messages will be sent as text only."
+        names = "\n".join(
+            f"  {i}. {os.path.basename(path)}"
+            for i, path in enumerate(self.scheduler_media_paths, 1)
+        )
+        return (
+            "Scheduled media (attached to every pack message):\n"
+            + names
+        )
+
+    def select_scheduler_media(self):
+        paths = filedialog.askopenfilenames(
+            title="Select 1–3 images or videos for the pack",
+            filetypes=[
+                (
+                    "Images and videos",
+                    "*.png *.jpg *.jpeg *.gif *.webp *.bmp "
+                    "*.mp4 *.mov *.webm *.avi *.mkv",
+                ),
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
+                ("Video files", "*.mp4 *.mov *.webm *.avi *.mkv"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not paths:
+            return
+        if len(paths) > 3:
+            return messagebox.showwarning(
+                "Scheduled media",
+                "Select between 1 and 3 images/videos.",
+            )
+        allowed_extensions = {
+            ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
+            ".mp4", ".mov", ".webm", ".avi", ".mkv",
+        }
+        invalid = [
+            path for path in paths
+            if os.path.splitext(path)[1].lower() not in allowed_extensions
+        ]
+        if invalid:
+            return messagebox.showwarning(
+                "Scheduled media",
+                "Unsupported media type selected:\n" + "\n".join(invalid),
+            )
+        self.scheduler_media_paths = list(paths)
+        if hasattr(self, "scheduler_media_label"):
+            self.scheduler_media_label.configure(text=self._scheduler_media_text())
+
+    def clear_scheduler_media(self):
+        self.scheduler_media_paths = []
+        if hasattr(self, "scheduler_media_label"):
+            self.scheduler_media_label.configure(text=self._scheduler_media_text())
 
     def start_scheduler(self, real=False):
         if self.scheduler and self.scheduler.running:return
@@ -292,7 +371,12 @@ class App(tk.Tk):
             if not self.settings.signal_account:return messagebox.showwarning("Signal","Set the Signal account before starting real mode.")
             if not self.storage.get_groups(enabled_only=True):return messagebox.showwarning("Signal","Enable at least one authorized group before starting real mode.")
             from .main import build_sender
-            process=build_sender(self.settings,self.storage); mode="real"
+            process=build_sender(
+                self.settings,
+                self.storage,
+                attachments=list(self.scheduler_media_paths),
+            )
+            mode="real"
         else:
             process=lambda m:self.storage.log("INFO",f"PREVIEW: {m[:160]}"); mode="preview"
         from .scheduler import Scheduler
