@@ -13,12 +13,13 @@ from .storage import Storage
 
 
 BG="#070a09"; PANEL="#101815"; PANEL2="#131d18"; GREEN="#39ff88"; WHITE="#f2fff8"; MUTED="#8da99b"; RED="#ff5c6c"
+BRAND_NAME="SECMOD"; BRAND_TELEGRAM="@RU_LAPSUS"; BRAND_DEVELOPER="@CODERX0981"
 
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("SIGNAL BOT — Control Panel")
+        self.title("SECMOD — SIGNAL BOT")
         self.geometry("1250x820")
         self.minsize(1000,700)
         self.configure(bg=BG)
@@ -46,8 +47,16 @@ class App(tk.Tk):
 
     def _build_nav(self):
         bar=tk.Frame(self,bg=PANEL); bar.pack(fill="x")
+        brand=tk.Frame(bar,bg=PANEL,padx=12,pady=5)
+        brand.pack(side="left",padx=(4,10))
+        tk.Label(brand,text=BRAND_NAME,bg=PANEL,fg=GREEN,font=("Segoe UI",13,"bold")).pack(anchor="w")
+        tk.Label(brand,text="SIGNAL AUTOMATION SUITE",bg=PANEL,fg=MUTED,font=("Segoe UI",8,"bold")).pack(anchor="w")
         for key,label in [("generator","Message Generator"),("packs","Saved Packs"),("groups","Authorized Groups"),("scheduler","Scheduler"),("settings","Settings"),("logs","Logs")]:
             tk.Button(bar,text=label,command=lambda k=key:self.show(k),bg=PANEL2,fg=WHITE,relief="flat",padx=14,pady=10).pack(side="left",padx=2,pady=2)
+        contact=tk.Frame(bar,bg=PANEL,padx=10,pady=5)
+        contact.pack(side="right",padx=8)
+        tk.Label(contact,text=f"Telegram: {BRAND_TELEGRAM}",bg=PANEL,fg=WHITE,font=("Segoe UI",8,"bold")).pack(anchor="e")
+        tk.Label(contact,text=f"DEV: {BRAND_DEVELOPER}",bg=PANEL,fg=MUTED,font=("Segoe UI",8)).pack(anchor="e")
 
     def clear(self):
         for w in self.content.winfo_children(): w.destroy()
@@ -57,7 +66,10 @@ class App(tk.Tk):
         getattr(self,"_view_"+key)()
 
     def _title(self,text):
-        tk.Label(self.content,text=text,bg=BG,fg=GREEN,font=("Segoe UI",20,"bold")).pack(anchor="w",pady=(0,10))
+        heading=tk.Frame(self.content,bg=BG)
+        heading.pack(fill="x",pady=(0,10))
+        tk.Label(heading,text=text,bg=BG,fg=GREEN,font=("Segoe UI",20,"bold")).pack(side="left")
+        tk.Label(heading,text=f"{BRAND_NAME}  •  {BRAND_TELEGRAM}  •  DEV {BRAND_DEVELOPER}",bg=BG,fg=MUTED,font=("Segoe UI",8)).pack(side="right",pady=(9,0))
 
     def _view_generator(self):
         self._title("MESSAGE GENERATOR")
