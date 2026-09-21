@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 import threading
 import re
+import os
 
 from .config import Settings
 from .daily_content import generate_variations
@@ -342,7 +343,7 @@ class App(tk.Tk):
         }
         invalid = [
             path for path in paths
-            if __import__("os").path.splitext(path)[1].lower() not in allowed_extensions
+            if os.path.splitext(path)[1].lower() not in allowed_extensions
         ]
         if invalid:
             return messagebox.showwarning(
