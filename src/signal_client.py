@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import re
+import subprocess
 from dataclasses import dataclass
 from typing import Any
+
 
 @dataclass
 class SignalClient:
@@ -15,36 +16,104 @@ class SignalClient:
     def _run(self, *args: str) -> str:
         if not self.account.strip():
             raise ValueError("Signal account is required.")
-        cli=self.signal_cli.strip()
+
+        cli = self.signal_cli.strip()
         if not cli:
             raise ValueError("signal-cli path is required.")
+
         if os.path.sep in cli or "/" in cli:
             if not os.path.exists(cli):
-                raise FileNotFoundError(f"signal-cli executable not found: {cli}")
-        command=[cli, "-a", self.account, *args]
+                raise FileNotFoundError(
+                    f"signal-cli executable not found: {cli}"
+                )
+
+        command = [cli, "-a", self.account, *args]
+
         try:
-            result=subprocess.run(
-                command, capture_output=True, text=True,
-                encoding="utf-8", errors="replace", check=False,
-                shell=cli.lower().endswith((".bat",".cmd")),
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                shell=cli.lower().endswith((".bat", ".cmd")),
             )
         except FileNotFoundError as exc:
             raise FileNotFoundError(
-                f"Could not start signal-cli: {cli}. Check Settings → signal-cli path."
+                f"Could not start signal-cli: {cli}. "
+                f"Check Settings → signal-cli path."
             ) from exc
+
         if result.returncode:
-            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "signal-cli failed")
+            raise RuntimeError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "signal-cli failed"
+            )
+
         return result.stdout
+
+    def list_accounts(self) -> list[str]:
+        """Return Signal accounts registered in this local signal-cli installation."""
+        cli = self.signal_cli.strip()
+
+        if not cli:
+            raise ValueError("signal-cli path is required.")
+
+        if os.path.sep in cli or "/" in cli:
+            if not os.path.exists(cli):
+                raise FileNotFoundError(
+                    f"signal-cli executable not found: {cli}"
+                )
+
+        command = [cli, "listAccounts"]
+
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                shell=cli.lower().endswith((".bat", ".cmd")),
+            )
+        except FileNotFoundError as exc:
+            raise FileNotFoundError(
+                f"Could not start signal-cli: {cli}. "
+                f"Check Settings → signal-cli path."
+            ) from exc
+
+        if result.returncode:
+            raise RuntimeError(
+                result.stderr.strip()
+                or result.stdout.strip()
+                or "signal-cli listAccounts failed"
+            )
+
+        accounts = re.findall(
+            r"Number:\s*(\+\d+)",
+            result.stdout,
+        )
+
+        return list(dict.fromkeys(accounts))
 
     def link(self, device_name: str = "Signal Bot") -> subprocess.Popen:
         """Start signal-cli device linking without an account argument."""
-        cli=self.signal_cli.strip()
+        cli = self.signal_cli.strip()
+
         if not cli:
             raise ValueError("signal-cli path is required.")
+
         if os.path.sep in cli or "/" in cli:
             if not os.path.exists(cli):
-                raise FileNotFoundError(f"signal-cli executable not found: {cli}")
-        command=[cli,"link","-n",device_name]
+                raise FileNotFoundError(
+                    f"signal-cli executable not found: {cli}"
+                )
+
+        command = [cli, "link", "-n", device_name]
+
         try:
             return subprocess.Popen(
                 command,
@@ -53,17 +122,21 @@ class SignalClient:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                shell=cli.lower().endswith((".bat",".cmd")),
+                shell=cli.lower().endswith((".bat", ".cmd")),
                 bufsize=1,
             )
         except FileNotFoundError as exc:
             raise FileNotFoundError(
-                f"Could not start signal-cli: {cli}. Check Settings → signal-cli path."
+                f"Could not start signal-cli: {cli}. "
+                f"Check Settings → signal-cli path."
             ) from exc
 
     @staticmethod
     def extract_link_uri(output: str) -> str | None:
-        match=re.search(r"sgnl://linkdevice\?[^\s\r\n]+",output)
+        match = re.search(
+            r"sgnl://linkdevice\?[^\s\r\n]+",
+            output,
+        )
         return match.group(0).rstrip('"\'') if match else None
 
     def refresh(self) -> None:
@@ -71,36 +144,67 @@ class SignalClient:
         self._run("receive", "--timeout", "1")
 
     def list_groups(self) -> list[dict[str, Any]]:
-        # A linked signal-cli account can learn about newly created groups
-        # through pending storage-sync events. Process those first.
+        """Return groups available to the linked Signal account."""
         try:
             self.refresh()
         except RuntimeError:
-            # Group listing should still work if there were no pending events
-            # or receive is unavailable for this account mode.
             pass
-        raw = self._run("--output", "json", "listGroups")
+
+        raw = self._run(
+            "--output",
+            "json",
+            "listGroups",
+        )
+
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise RuntimeError("signal-cli returned invalid JSON.") from exc
+            raise RuntimeError(
+                "signal-cli returned invalid JSON."
+            ) from exc
+
         if not isinstance(data, list):
-            raise RuntimeError("Unexpected listGroups response.")
+            raise RuntimeError(
+                "Unexpected listGroups response."
+            )
+
         groups = []
+
         for item in data:
             if not isinstance(item, dict):
                 continue
+
             gid = str(item.get("id", "")).strip()
-            name = str(item.get("name", "")).strip() or "(Unnamed group)"
+            name = str(item.get("name", "")).strip()
+
+            if not name:
+                name = "(Unnamed group)"
+
             if gid:
-                groups.append({"name": name, "group_id": gid})
+                groups.append(
+                    {
+                        "name": name,
+                        "group_id": gid,
+                    }
+                )
+
         return groups
 
     def send_to_group(self, group_id: str, message: str) -> None:
+        """Send a message to a Signal group."""
         group_id = group_id.strip()
         message = message.strip()
+
         if not group_id:
             raise ValueError("Signal group ID is required.")
+
         if not message:
             raise ValueError("Message is required.")
-        self._run("send", "-g", group_id, "-m", message)
+
+        self._run(
+            "send",
+            "-g",
+            group_id,
+            "-m",
+            message,
+        )

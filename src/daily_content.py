@@ -1,4 +1,4 @@
-﻿"""Generate 24 deterministic, human-reviewable rewrites."""
+"""Generate 24 deterministic, human-reviewable Norwegian rewrites."""
 
 from __future__ import annotations
 
@@ -13,7 +13,12 @@ class ContentPack:
 
 
 def _clean(text: str) -> str:
-    return re.sub(r"\s+", " ", text.strip())
+    """Clean spaces while preserving line breaks and blank lines."""
+    lines = [
+        re.sub(r"[ \t]+", " ", line).strip()
+        for line in text.splitlines()
+    ]
+    return "\n".join(lines).strip()
 
 
 def generate_variations(source: str, count: int = 24) -> list[str]:
@@ -23,33 +28,35 @@ def generate_variations(source: str, count: int = 24) -> list[str]:
         raise ValueError("Daily message cannot be empty")
 
     if count != 24:
-        raise ValueError("This workflow is configured for exactly 24 variations")
+        raise ValueError(
+            "This workflow is configured for exactly 24 variations"
+        )
 
     templates = [
-        source,
-        f"Update: {source}",
-        f"Quick update - {source}",
-        f"Just a quick note: {source}",
-        f"Sharing today's update: {source}",
-        f"For today's update: {source}",
-        f"Today's note: {source}",
-        f"Please note: {source}",
-        f"Here's the latest update: {source}",
-        f"Latest update - {source}",
-        f"Sharing the latest information: {source}",
-        f"A quick message for today: {source}",
-        f"Today's information is below: {source}",
-        f"Please see today's update: {source}",
-        f"Here's today's information: {source}",
-        f"Today's update is as follows: {source}",
-        f"One update for today: {source}",
-        f"Sharing one item for today: {source}",
-        f"Today's message: {source}",
-        f"Latest note for today: {source}",
-        f"Please take a look at this update: {source}",
-        f"Here is the latest note: {source}",
-        f"Sharing a quick note for today: {source}",
-        f"One more update: {source}",
+        f"🔥📢 Dagens oppdatering ✨\n\n{source} 🚀😊",
+        f"📣✨ En rask oppdatering 🔥\n\n{source} 💡🙌",
+        f"👋😊 Bare en liten oppdatering 🌟\n\n{source} ✨🚀",
+        f"📢🔥 Her kommer dagens oppdatering ✨\n\n{source} 😊💫",
+        f"🆕🚀 Her er siste nytt 💡\n\n{source} 🔥✨",
+        f"🌟📌 Dagens informasjon ✨\n\n{source} 😊🔥",
+        f"💬👋 En liten beskjed for i dag ✨\n\n{source} 😊🙌",
+        f"🚀🔥 Her er den siste oppdateringen 📢\n\n{source} ✨💡",
+        f"📌✨ Siste oppdatering 🔔\n\n{source} 🔥😊",
+        f"🔔🙌 Vi deler den siste informasjonen 📢\n\n{source} ✨🚀",
+        f"💡🚀 En kort melding for i dag ✨\n\n{source} 😊🔥",
+        f"📝📢 Dagens melding finner du nedenfor 👇\n\n{source} ✨😊",
+        f"📣✨ Vennligst se dagens oppdatering 👀\n\n{source} 🔥🙌",
+        f"🌟🔥 Her er informasjonen for i dag 📌\n\n{source} ✨😊",
+        f"📢💫 Dagens oppdatering er som følger 🔥\n\n{source} 🚀✨",
+        f"☀️😊 En oppdatering for i dag 📢\n\n{source} ✨🙌",
+        f"🔥📌 Vi deler en viktig oppdatering 💡\n\n{source} ✨🚀",
+        f"💬✨ Her er dagens melding 📢\n\n{source} 😊🔥",
+        f"🆕💡 Den siste informasjonen er 🚀\n\n{source} ✨🙌",
+        f"👀📢 Ta gjerne en titt på denne oppdateringen ✨\n\n{source} 💡😊",
+        f"🔔✨ Her er den nyeste beskjeden 📌\n\n{source} 🔥🙌",
+        f"✨📢 Vi deler en kort oppdatering for i dag 😊\n\n{source} 🚀💫",
+        f"🚨🔥 En siste oppdatering 📣\n\n{source} ✨😊",
+        f"🎉🌟 Dagens oppdatering er her 🚀\n\n{source} 🔥🙌",
     ]
 
     return templates
