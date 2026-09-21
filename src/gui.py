@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox, filedialog, simpledialog
 import threading
 import re
 import os
+from datetime import datetime
 
 from .config import Settings
 from .daily_content import generate_variations
@@ -326,15 +327,31 @@ class App(tk.Tk):
             bg=PANEL,fg=MUTED,
         ).pack(anchor="w",pady=(3,0))
 
+        self.scheduler_status_label=tk.Label(
+            left,
+            text=f"● BOT {state}",
+            bg=PANEL,
+            fg=state_fg,
+            font=("Segoe UI",14,"bold"),
+        )
+        self.scheduler_status_label.pack(anchor="w")
+        self.scheduler_uptime_label=tk.Label(
+            left,
+            text="UPTIME 00:00:00" if state=="ONLINE" else "UPTIME —",
+            bg=PANEL,
+            fg=MUTED,
+        )
+        self.scheduler_uptime_label.pack(anchor="w",pady=(3,0))
+
         stats=tk.Frame(status,bg=PANEL); stats.pack(side="right")
-        tk.Label(stats,text="NEXT POST",bg=PANEL,fg=MUTED).grid(row=0,column=0,padx=18)
-        tk.Label(stats,text="LAST POST",bg=PANEL,fg=MUTED).grid(row=0,column=1,padx=18)
-        tk.Label(stats,text="POSTS TODAY",bg=PANEL,fg=MUTED).grid(row=0,column=2,padx=18)
-        tk.Label(stats,text="SKIPPED",bg=PANEL,fg=MUTED).grid(row=0,column=3,padx=18)
-        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=0)
-        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=1)
-        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=2)
-        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=3)
+        for col,title in enumerate(("NEXT POST","LAST POST","POSTS TODAY","SKIPPED")):
+            tk.Label(stats,text=title,bg=PANEL,fg=MUTED).grid(row=0,column=col,padx=18)
+        self.scheduler_next_label=tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold"))
+        self.scheduler_last_label=tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold"))
+        self.scheduler_posts_label=tk.Label(stats,text="0",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold"))
+        self.scheduler_skipped_label=tk.Label(stats,text="0",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold"))
+        for col,label in enumerate((self.scheduler_next_label,self.scheduler_last_label,self.scheduler_posts_label,self.scheduler_skipped_label)):
+            label.grid(row=1,column=col)
 
         # Mode selector
         mode_box=tk.Frame(self.content,bg=BG)
@@ -437,6 +454,67 @@ class App(tk.Tk):
             command=self.send_media_now,
             bg=PANEL2,fg=GREEN,padx=18,pady=9,
         ).pack(side="right",padx=4)
+
+    def _scheduler_runtime_state(self, state):
+        self.after(0, self._update_scheduler_dashboard)
+
+    def _scheduler_post_event(self, success, error):
+        if success:
+            self.storage.log("INFO", "Scheduler post completed.")
+        self.after(0, self._update_scheduler_dashboard)
+
+    def _scheduler_error_event(self, error):
+        self.storage.log("ERROR", f"Scheduler delivery error: {error}")
+        self.after(0, self._update_scheduler_dashboard)
+
+    def _format_runtime_time(self, value):
+        return value.strftime("%H:%M:%S") if value else "—"
+
+    def _update_scheduler_dashboard(self):
+        scheduler=self.scheduler
+        if not hasattr(self,"scheduler_status_label"):
+            return
+        try:
+            if not self.scheduler_status_label.winfo_exists():
+                return
+        except Exception:
+            return
+
+        running=bool(scheduler and scheduler.running)
+        if running:
+            fg=GREEN
+            text="● BOT ONLINE"
+        elif scheduler and scheduler.last_error:
+            fg="#ffb000"
+            text="● BOT ERROR"
+        else:
+            fg=RED
+            text="● BOT OFFLINE"
+
+        self.scheduler_status_label.configure(text=text,fg=fg)
+
+        if running and scheduler and scheduler.started_at:
+            elapsed=max(0,int((datetime.now()-scheduler.started_at).total_seconds()))
+            h,rem=divmod(elapsed,3600)
+            m,s=divmod(rem,60)
+            self.scheduler_uptime_label.configure(text=f"UPTIME {h:02d}:{m:02d}:{s:02d}")
+        else:
+            self.scheduler_uptime_label.configure(text="UPTIME —")
+
+        self.scheduler_next_label.configure(
+            text=self._format_runtime_time(scheduler.next_post_at if scheduler else None)
+        )
+        self.scheduler_last_label.configure(
+            text=self._format_runtime_time(scheduler.last_post_at if scheduler else None)
+        )
+        self.scheduler_posts_label.configure(
+            text=str(scheduler.posts_today if scheduler else 0)
+        )
+        self.scheduler_skipped_label.configure(
+            text=str(scheduler.skipped if scheduler else 0)
+        )
+
+        self.after(1000,self._update_scheduler_dashboard)
 
     def _scheduler_mode_changed(self):
         mode=self.scheduler_mode.get()
@@ -637,7 +715,14 @@ class App(tk.Tk):
         # Signal delivery or attempt to evade platform anti-spam controls.
         selected_mode=self.scheduler_mode.get()
         self.storage.set_setting("scheduler_mode",selected_mode)
-        self.scheduler=Scheduler(msgs,self.settings.interval_minutes,self.settings.cycle_hours)
+        self.scheduler=Scheduler(
+            msgs,
+            self.settings.interval_minutes,
+            self.settings.cycle_hours,
+            on_state_change=self._scheduler_runtime_state,
+            on_post=self._scheduler_post_event,
+            on_error=self._scheduler_error_event,
+        )
         try:
             self.scheduler.start(process)
             self.storage.log("INFO",f"Scheduler started ({mode}) using pack #{pid}")
