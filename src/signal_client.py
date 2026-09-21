@@ -150,12 +150,13 @@ class SignalClient:
         self._run("receive", "--timeout", "1")
 
     def list_groups(self) -> list[dict[str, Any]]:
-        """Return groups available to the linked Signal account."""
-        try:
-            self.refresh()
-        except RuntimeError:
-            pass
+        """Return groups available to the linked Signal account.
 
+        Group discovery only needs listGroups. Do not run receive here:
+        receive is a separate synchronization operation and can leave a Java
+        process waiting on the local Signal data/config while the GUI is trying
+        to refresh the group list.
+        """
         raw = self._run(
             "--output",
             "json",
