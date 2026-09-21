@@ -804,8 +804,57 @@ class App(tk.Tk):
 
     def _view_logs(self):
         self._title("LOGS")
-        box=tk.Text(self.content,bg="#09100d",fg=WHITE);box.pack(fill="both",expand=True)
-        for r in reversed(self.storage.get_logs(500)):box.insert("end",f"{r['created_at']} | {r['level']} | {r['message']}\n")
+
+        toolbar=tk.Frame(self.content,bg=BG)
+        toolbar.pack(fill="x",pady=(0,8))
+
+        tk.Button(
+            toolbar,text="REFRESH LOGS",command=self._refresh_logs,
+            bg=PANEL2,fg=WHITE,padx=14,pady=7,
+        ).pack(side="left",padx=(0,5))
+
+        tk.Button(
+            toolbar,text="CLEAR LOGS",command=self.clear_logs,
+            bg=RED,fg=BG,font=("Segoe UI",9,"bold"),padx=14,pady=7,
+        ).pack(side="right")
+
+        self.logs_box=tk.Text(
+            self.content,bg="#09100d",fg=WHITE,
+            insertbackground=GREEN,wrap="word",
+        )
+        self.logs_box.pack(fill="both",expand=True)
+        self._refresh_logs()
+
+    def _refresh_logs(self):
+        if not hasattr(self,"logs_box") or not self.logs_box.winfo_exists():
+            return
+        self.logs_box.configure(state="normal")
+        self.logs_box.delete("1.0","end")
+        rows=self.storage.get_logs(500)
+        for r in reversed(rows):
+            self.logs_box.insert(
+                "end",
+                f"{r['created_at']} | {r['level']} | {r['message']}\n",
+            )
+        self.logs_box.configure(state="disabled")
+
+    def clear_logs(self):
+        if not messagebox.askyesno(
+            "Clear logs",
+            "Delete all stored application logs? This cannot be undone.",
+            parent=self,
+        ):
+            return
+        try:
+            count=self.storage.clear_logs()
+            self._refresh_logs()
+            messagebox.showinfo(
+                "Logs",
+                f"Cleared {count} log entr{'y' if count == 1 else 'ies'}.",
+                parent=self,
+            )
+        except Exception as e:
+            messagebox.showerror("Logs",str(e),parent=self)
 
 def main():App().mainloop()
 
