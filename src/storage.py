@@ -161,6 +161,15 @@ class Storage:
             )
             self.db.commit()
 
+    def clear_logs(self) -> int:
+        """Delete all application log entries and return the number removed."""
+        with self._lock:
+            cur = self.db.execute("SELECT COUNT(*) FROM logs")
+            count = int(cur.fetchone()[0])
+            self.db.execute("DELETE FROM logs")
+            self.db.commit()
+            return count
+
     def get_logs(self, limit: int = 500) -> list[dict[str, Any]]:
         with self._lock:
             return [
