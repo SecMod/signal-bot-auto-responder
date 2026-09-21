@@ -316,7 +316,9 @@ class App(tk.Tk):
 
     def select_scheduler_media(self):
         paths = filedialog.askopenfilenames(
+            parent=self,
             title="Select 1–3 images or videos for the pack",
+            multiple=True,
             filetypes=[
                 (
                     "Images and videos",
@@ -328,12 +330,16 @@ class App(tk.Tk):
                 ("All files", "*.*"),
             ],
         )
+        # Some native Tk file dialogs can return a single string even when
+        # multi-selection is requested. Normalize it before processing.
+        if isinstance(paths, str):
+            paths = (paths,) if paths else ()
         if not paths:
             return
         if len(paths) > 3:
             return messagebox.showwarning(
                 "Scheduled media",
-                "Select between 1 and 3 images/videos.",
+                f"You selected {len(paths)} files. Select between 1 and 3 images/videos.",
             )
         allowed_extensions = {
             ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp",
@@ -348,9 +354,15 @@ class App(tk.Tk):
                 "Scheduled media",
                 "Unsupported media type selected:\n" + "\n".join(invalid),
             )
-        self.scheduler_media_paths = list(paths)
+        # Keep the selected files in the exact order returned by the dialog
+        # and refresh the UI with all selected entries.
+        self.scheduler_media_paths = list(paths[:3])
         if hasattr(self, "scheduler_media_label"):
             self.scheduler_media_label.configure(text=self._scheduler_media_text())
+        self.storage.log(
+            "INFO",
+            f"Scheduled media selected: {len(self.scheduler_media_paths)} file(s).",
+        )
 
     def clear_scheduler_media(self):
         self.scheduler_media_paths = []
@@ -404,7 +416,9 @@ class App(tk.Tk):
             return messagebox.showwarning("Signal", "Enable at least one authorized group first.")
 
         paths = filedialog.askopenfilenames(
+            parent=self,
             title="Select 1–3 images or videos to send",
+            multiple=True,
             filetypes=[
                 ("Images and videos", "*.png *.jpg *.jpeg *.gif *.webp *.bmp *.mp4 *.mov *.webm *.avi *.mkv"),
                 ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
@@ -412,6 +426,8 @@ class App(tk.Tk):
                 ("All files", "*.*"),
             ],
         )
+        if isinstance(paths, str):
+            paths = (paths,) if paths else ()
         if not paths:
             return
 
