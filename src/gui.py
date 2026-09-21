@@ -273,7 +273,7 @@ class App(tk.Tk):
                         continue
                 self.storage.log(
                     "INFO",
-                    f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.",
+                    f"Signal group refresh completed: {len(groups)} groups found; {added} new groups added as disabled.",
                 )
                 self.after(0,lambda:self._groups_load_finished(len(groups),added,None))
             except Exception as e:
@@ -290,17 +290,19 @@ class App(tk.Tk):
         if status is not None:
             status.configure(
                 text=(
-                    f"Loaded {count} groups • {added} new groups added as DISABLED."
+                    f"Signal group list updated • {count} groups found • {added} new groups added as DISABLED."
                     if error is None
-                    else f"Load failed: {error}"
+                    else f"Signal group update failed: {error}"
                 )
             )
         self.refresh_groups()
         if error is None:
             messagebox.showinfo(
-                "Signal groups",
-                f"Loaded {count} groups. {added} new groups were added as DISABLED. "
-                "Enable only authorized groups.",
+                "Signal groups updated",
+                f"Signal group list updated successfully.\n\n"
+                f"Groups found: {count}\n"
+                f"New groups added: {added}\n"
+                "New groups were added as DISABLED. Enable only authorized groups.",
             )
         else:
             messagebox.showerror("Signal",error)
