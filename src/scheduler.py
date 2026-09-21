@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import math
 import threading
+from datetime import datetime
 from collections.abc import Callable, Sequence
 
 
@@ -11,6 +11,9 @@ class Scheduler:
         messages: Sequence[str],
         interval_minutes: int = 15,
         cycle_hours: int = 6,
+        on_state_change: Callable[[str], None] | None = None,
+        on_post: Callable[[bool, str | None], None] | None = None,
+        on_error: Callable[[Exception], None] | None = None,
     ):
         if not messages:
             raise ValueError("At least one message is required.")
@@ -21,43 +24,96 @@ class Scheduler:
         self.cycle_hours = cycle_hours
         self.index = 0
         self.running = False
+        self.started_at: datetime | None = None
+        self.last_post_at: datetime | None = None
+        self.next_post_at: datetime | None = None
+        self.posts_today = 0
+        self.skipped = 0
+        self.last_error: str | None = None
         self._stop = threading.Event()
-
-    @property
-    def max_messages_per_cycle(self) -> int:
-        """Number of immediate-first deliveries that fit in one cycle."""
-        return max(1, math.ceil((self.cycle_hours * 60) / self.interval_minutes))
+        self._thread: threading.Thread | None = None
+        self._lock = threading.RLock()
+        self.on_state_change = on_state_change
+        self.on_post = on_post
+        self.on_error = on_error
 
     def next_message(self) -> str:
-        message = self.messages[self.index % len(self.messages)]
-        self.index += 1
-        return message
+        with self._lock:
+            message = self.messages[self.index % len(self.messages)]
+            self.index += 1
+            return message
+
+    def _notify_state(self, state: str) -> None:
+        callback = self.on_state_change
+        if callback:
+            try:
+                callback(state)
+            except Exception:
+                pass
 
     def start(self, process: Callable[[str], None]) -> bool:
-        if self.running:
-            return False
-        self.running = True
-        self._stop.clear()
+        with self._lock:
+            if self.running:
+                return False
+            self.running = True
+            self.started_at = datetime.now()
+            self.last_error = None
+            self.next_post_at = datetime.now()
+            self._stop.clear()
 
         def worker():
-            delivered = 0
+            self._notify_state("online")
             try:
-                while not self._stop.is_set() and delivered < self.max_messages_per_cycle:
-                    process(self.next_message())
-                    delivered += 1
-                    if delivered >= self.max_messages_per_cycle:
+                while not self._stop.is_set():
+                    message = self.next_message()
+                    try:
+                        process(message)
+                        with self._lock:
+                            self.posts_today += 1
+                            self.last_post_at = datetime.now()
+                            self.last_error = None
+                    except Exception as exc:
+                        with self._lock:
+                            self.last_error = str(exc)
+                        if self.on_error:
+                            try:
+                                self.on_error(exc)
+                            except Exception:
+                                pass
+                    if self.on_post:
+                        try:
+                            self.on_post(self.last_error is None, self.last_error)
+                        except Exception:
+                            pass
+
+                    if self._stop.is_set():
                         break
+
+                    with self._lock:
+                        self.next_post_at = datetime.now()
+                    self.next_post_at = datetime.now()
                     if self._stop.wait(self.interval_minutes * 60):
                         break
             finally:
-                self.running = False
+                with self._lock:
+                    self.running = False
+                    self.next_post_at = None
+                self._notify_state("offline")
 
-        threading.Thread(target=worker, daemon=True, name="scheduler").start()
+        self._thread = threading.Thread(
+            target=worker,
+            daemon=True,
+            name="scheduler",
+        )
+        self._thread.start()
         return True
 
     def stop(self):
         self._stop.set()
-        self.running = False
+        with self._lock:
+            self.running = False
+            self.next_post_at = None
+        self._notify_state("offline")
 
     def update(
         self,
