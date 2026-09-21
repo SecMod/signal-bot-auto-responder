@@ -255,6 +255,25 @@ class App(tk.Tk):
         self._title("SCHEDULER")
         state="RUNNING" if self.scheduler and self.scheduler.running else "STOPPED"
         tk.Label(self.content,text=f"Status: {state}\nApproved messages: {self.settings.variation_count}\nInterval: {self.settings.interval_minutes} minutes\nCycle: {self.settings.cycle_hours} hours\nSignal enabled: {'YES' if self.settings.signal_enabled else 'NO'}",bg=BG,fg=WHITE,justify="left").pack(anchor="w",pady=10)
+        tk.Label(self.content,text="Mode:",bg=BG,fg=WHITE).pack(anchor="w",pady=(8,2))
+        mode_frame=tk.Frame(self.content,bg=BG); mode_frame.pack(anchor="w",pady=(0,8))
+        self.scheduler_mode=tk.StringVar(value=getattr(self,"scheduler_mode","normal"))
+        tk.Radiobutton(
+            mode_frame,text="NORMAL MODE",variable=self.scheduler_mode,value="normal",
+            bg=BG,fg=WHITE,selectcolor=PANEL,activebackground=BG,activeforeground=GREEN,
+        ).pack(side="left",padx=(0,12))
+        tk.Radiobutton(
+            mode_frame,text="SAFE MODE",variable=self.scheduler_mode,value="safe",
+            bg=BG,fg=WHITE,selectcolor=PANEL,activebackground=BG,activeforeground=GREEN,
+        ).pack(side="left")
+
+        if self.scheduler_mode.get()=="safe":
+            tk.Label(
+                self.content,
+                text="SAFE MODE: 60 min minimum interval • 8 posts/group/24h • 24h duplicate cooldown • quiet hours 23:00–08:00",
+                bg=BG,fg=MUTED,wraplength=1000,justify="left",
+            ).pack(anchor="w",pady=(0,8))
+
         tk.Label(self.content,text="Pack to use:",bg=BG,fg=WHITE).pack(anchor="w")
         self.pack_choice=tk.StringVar()
         self.pack_combo=ttk.Combobox(self.content,textvariable=self.pack_choice,state="readonly",width=80)
@@ -477,6 +496,11 @@ class App(tk.Tk):
         else:
             process=lambda m:self.storage.log("INFO",f"PREVIEW: {m[:160]}"); mode="preview"
         from .scheduler import Scheduler
+        # Safe Mode is selected in the GUI and is persisted for the running scheduler.
+        # Its enforcement layer is added separately; this selection does not alter
+        # Signal delivery or attempt to evade platform anti-spam controls.
+        selected_mode=self.scheduler_mode.get()
+        self.storage.set_setting("scheduler_mode",selected_mode)
         self.scheduler=Scheduler(msgs,self.settings.interval_minutes,self.settings.cycle_hours)
         try:
             self.scheduler.start(process)
