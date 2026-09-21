@@ -140,11 +140,10 @@ class SignalClient:
     @staticmethod
     def extract_link_uri(output: str) -> str | None:
         match = re.search(
-            r"sgnl://linkdevice?[^s
-]+",
+            r"sgnl://linkdevice\?[^s]+",
             output,
         )
-        return match.group(0).rstrip('"'') if match else None
+        return match.group(0).rstrip('"') if match else None
 
     def refresh(self) -> None:
         """Process pending Signal events/storage sync before querying groups."""
