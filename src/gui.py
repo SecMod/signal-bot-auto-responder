@@ -548,7 +548,7 @@ class App(tk.Tk):
 
     def _scheduler_mode_changed(self):
         mode=self.scheduler_mode.get()
-        self.storage.set_setting("scheduler_mode",mode)
+        self.storage.set_settings({"scheduler_mode":mode})
         # Refresh the dashboard so the selected mode is immediately visible.
         # Do not restart a running scheduler automatically.
         if hasattr(self,"_scheduler_mode_refresh_pending") and self._scheduler_mode_refresh_pending:
