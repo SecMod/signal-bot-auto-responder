@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import threading
 import re
 
@@ -265,6 +265,13 @@ class App(tk.Tk):
         tk.Button(buttons,text="START PREVIEW / DRY RUN",command=lambda:self.start_scheduler(False),bg=GREEN,fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="START REAL (AUTHORIZED)",command=lambda:self.start_scheduler(True),bg="#d6a900",fg=BG).pack(side="left",padx=4)
         tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
+        tk.Button(
+            buttons,
+            text="SEND IMAGE NOW",
+            command=self.send_image_now,
+            bg=PANEL2,
+            fg=GREEN,
+        ).pack(side="left",padx=4)
 
     def _reload_scheduler_view(self):
         if not self.winfo_exists():return
@@ -301,6 +308,57 @@ class App(tk.Tk):
     def stop_scheduler(self):
         if self.scheduler:self.scheduler.stop();self.storage.log("INFO","Scheduler stopped")
         self.show("scheduler")
+
+    def send_image_now(self):
+        if not self.settings.signal_enabled:
+            return messagebox.showwarning("Signal", "Enable Signal in Settings before sending.")
+        if not self.settings.signal_account:
+            return messagebox.showwarning("Signal", "Set or link the Signal account first.")
+        groups = self.storage.get_groups(enabled_only=True)
+        if not groups:
+            return messagebox.showwarning("Signal", "Enable at least one authorized group first.")
+
+        paths = filedialog.askopenfilenames(
+            title="Select image(s) to send",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.gif *.webp *.bmp"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not paths:
+            return
+
+        caption = simpledialog.askstring(
+            "Image caption",
+            "Optional caption (leave blank for no caption):",
+            parent=self,
+        )
+        if caption is None:
+            caption = ""
+
+        try:
+            from .signal_client import SignalClient
+            client = SignalClient(
+                self.settings.signal_account,
+                self.settings.signal_cli_path or "signal-cli",
+            )
+            for group in groups:
+                client.send_to_group(
+                    group["group_id"],
+                    caption,
+                    attachments=list(paths),
+                )
+            self.storage.log(
+                "INFO",
+                f"REAL: sent {len(paths)} image(s) to {len(groups)} authorized group(s).",
+            )
+            messagebox.showinfo(
+                "Signal",
+                f"Sent {len(paths)} image(s) to {len(groups)} authorized group(s).",
+            )
+        except Exception as e:
+            self.storage.log("ERROR", f"Image send failed: {e}")
+            messagebox.showerror("Signal image send", str(e))
 
     def _view_settings(self):
         self._title("SETTINGS")

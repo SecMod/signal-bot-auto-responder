@@ -42,3 +42,28 @@ def test_extract_link_uri():
     assert uri is not None
     assert uri.startswith(prefix)
     assert uri.endswith("uuid=abc12345&pub_key=xyz12345")
+
+def test_send_image_attachment(monkeypatch):
+    calls = []
+
+    class Result:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return Result()
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr("os.path.isfile", lambda path: True)
+
+    SignalClient("+123", "signal-cli").send_to_group(
+        "gid",
+        "caption",
+        attachments=["photo.jpg", "photo2.png"],
+    )
+    assert calls == [[
+        "signal-cli", "-a", "+123", "send", "-g", "gid",
+        "-m", "caption", "-a", "photo.jpg", "photo2.png",
+    ]]
