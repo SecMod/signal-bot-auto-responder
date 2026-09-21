@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections.abc import Callable, Sequence
 
 
@@ -78,8 +78,11 @@ class Scheduler:
                     try:
                         process(message)
                         with self._lock:
+                            now = datetime.now()
+                            if self.last_post_at and self.last_post_at.date() != now.date():
+                                self.posts_today = 0
                             self.posts_today += 1
-                            self.last_post_at = datetime.now()
+                            self.last_post_at = now
                             self.last_error = None
                     except Exception as exc:
                         with self._lock:
@@ -99,8 +102,7 @@ class Scheduler:
                         break
 
                     with self._lock:
-                        self.next_post_at = datetime.now()
-                    self.next_post_at = datetime.now()
+                        self.next_post_at = datetime.now() + timedelta(minutes=self.interval_minutes)
                     if self._stop.wait(self.interval_minutes * 60):
                         break
             finally:
