@@ -252,70 +252,150 @@ class App(tk.Tk):
             messagebox.showerror("Signal",str(e))
 
     def _view_scheduler(self):
-        self._title("SCHEDULER")
-        state="RUNNING" if self.scheduler and self.scheduler.running else "STOPPED"
-        tk.Label(self.content,text=f"Status: {state}\nApproved messages: {self.settings.variation_count}\nInterval: {self.settings.interval_minutes} minutes\nCycle: {self.settings.cycle_hours} hours\nSignal enabled: {'YES' if self.settings.signal_enabled else 'NO'}",bg=BG,fg=WHITE,justify="left").pack(anchor="w",pady=10)
-        tk.Label(self.content,text="Mode:",bg=BG,fg=WHITE).pack(anchor="w",pady=(8,2))
-        mode_frame=tk.Frame(self.content,bg=BG); mode_frame.pack(anchor="w",pady=(0,8))
-        self.scheduler_mode=tk.StringVar(value=getattr(self,"scheduler_mode","normal"))
-        tk.Radiobutton(
-            mode_frame,text="NORMAL MODE",variable=self.scheduler_mode,value="normal",
-            bg=BG,fg=WHITE,selectcolor=PANEL,activebackground=BG,activeforeground=GREEN,
-        ).pack(side="left",padx=(0,12))
-        tk.Radiobutton(
-            mode_frame,text="SAFE MODE",variable=self.scheduler_mode,value="safe",
-            bg=BG,fg=WHITE,selectcolor=PANEL,activebackground=BG,activeforeground=GREEN,
-        ).pack(side="left")
+        self._title("SCHEDULER — 24/7 CONTROL")
+        state="ONLINE" if self.scheduler and self.scheduler.running else "OFFLINE"
+        state_fg=GREEN if state=="ONLINE" else RED
 
-        if self.scheduler_mode.get()=="safe":
-            tk.Label(
-                self.content,
-                text="SAFE MODE: 60 min minimum interval • 8 posts/group/24h • 24h duplicate cooldown • quiet hours 23:00–08:00",
-                bg=BG,fg=MUTED,wraplength=1000,justify="left",
-            ).pack(anchor="w",pady=(0,8))
+        # Status header
+        status=tk.Frame(self.content,bg=PANEL,padx=16,pady=12)
+        status.pack(fill="x",pady=(0,10))
+        left=tk.Frame(status,bg=PANEL); left.pack(side="left",fill="x",expand=True)
+        tk.Label(
+            left,text=f"● BOT {state}",bg=PANEL,fg=state_fg,
+            font=("Segoe UI",14,"bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            left,
+            text="24/7 scheduler service • GUI is the control panel",
+            bg=PANEL,fg=MUTED,
+        ).pack(anchor="w",pady=(3,0))
 
-        tk.Label(self.content,text="Pack to use:",bg=BG,fg=WHITE).pack(anchor="w")
+        stats=tk.Frame(status,bg=PANEL); stats.pack(side="right")
+        tk.Label(stats,text="NEXT POST",bg=PANEL,fg=MUTED).grid(row=0,column=0,padx=18)
+        tk.Label(stats,text="LAST POST",bg=PANEL,fg=MUTED).grid(row=0,column=1,padx=18)
+        tk.Label(stats,text="POSTS TODAY",bg=PANEL,fg=MUTED).grid(row=0,column=2,padx=18)
+        tk.Label(stats,text="SKIPPED",bg=PANEL,fg=MUTED).grid(row=0,column=3,padx=18)
+        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=0)
+        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=1)
+        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=2)
+        tk.Label(stats,text="—",bg=PANEL,fg=WHITE,font=("Segoe UI",11,"bold")).grid(row=1,column=3)
+
+        # Mode selector
+        mode_box=tk.Frame(self.content,bg=BG)
+        mode_box.pack(fill="x",pady=4)
+        tk.Label(mode_box,text="MODE",bg=BG,fg=WHITE,font=("Segoe UI",11,"bold")).pack(anchor="w")
+        mode_row=tk.Frame(mode_box,bg=BG); mode_row.pack(anchor="w",pady=5)
+        self.scheduler_mode=tk.StringVar(
+            value=self.storage.get_setting("scheduler_mode","normal")
+        )
+        for value,label in (("normal","NORMAL MODE"),("safe","SAFE MODE")):
+            tk.Radiobutton(
+                mode_row,text=label,variable=self.scheduler_mode,value=value,
+                bg=PANEL2,fg=WHITE,selectcolor=BG,
+                activebackground=PANEL2,activeforeground=GREEN,
+                padx=18,pady=8,
+            ).pack(side="left",padx=(0,8))
+        self.scheduler_mode.trace_add("write",lambda *_: self._scheduler_mode_changed())
+
+        # Pack
+        pack_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=12)
+        pack_box.pack(fill="x",pady=8)
+        tk.Label(pack_box,text="PACK",bg=PANEL,fg=MUTED,font=("Segoe UI",9,"bold")).pack(anchor="w")
         self.pack_choice=tk.StringVar()
-        self.pack_combo=ttk.Combobox(self.content,textvariable=self.pack_choice,state="readonly",width=80)
+        self.pack_combo=ttk.Combobox(
+            pack_box,textvariable=self.pack_choice,state="readonly",width=90
+        )
         pack_rows=self.storage.list_packs()
-        self.pack_map={f'#{p["id"]} | {p["source"][:70]}':p["id"] for p in pack_rows}
+        self.pack_map={f'#{p["id"]} | {p["source"][:80]}':p["id"] for p in pack_rows}
         self.pack_combo["values"]=list(self.pack_map)
         if self.pack_combo["values"]: self.pack_combo.current(0)
-        self.pack_combo.pack(anchor="w",pady=(2,10))
-        buttons=tk.Frame(self.content,bg=BG);buttons.pack(anchor="w")
-        tk.Button(buttons,text="START PREVIEW / DRY RUN",command=lambda:self.start_scheduler(False),bg=GREEN,fg=BG).pack(side="left",padx=4)
-        tk.Button(buttons,text="START REAL (AUTHORIZED)",command=lambda:self.start_scheduler(True),bg="#d6a900",fg=BG).pack(side="left",padx=4)
-        tk.Button(buttons,text="STOP",command=self.stop_scheduler,bg=RED,fg=BG).pack(side="left",padx=4)
-        tk.Button(
-            buttons,
-            text="SELECT MEDIA (1–3)",
-            command=self.select_scheduler_media,
-            bg=PANEL2,
-            fg=GREEN,
-        ).pack(side="left",padx=4)
-        tk.Button(
-            buttons,
-            text="CLEAR MEDIA",
-            command=self.clear_scheduler_media,
-            bg=PANEL2,
-            fg=WHITE,
-        ).pack(side="left",padx=4)
-        tk.Button(
-            buttons,
-            text="SEND MEDIA NOW",
-            command=self.send_media_now,
-            bg=PANEL2,
-            fg=GREEN,
-        ).pack(side="left",padx=4)
+        self.pack_combo.pack(fill="x",pady=(5,0))
+
+        # Media
+        media_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=12)
+        media_box.pack(fill="x",pady=8)
+        tk.Label(media_box,text="MEDIA",bg=PANEL,fg=MUTED,font=("Segoe UI",9,"bold")).pack(anchor="w")
+        media_row=tk.Frame(media_box,bg=PANEL); media_row.pack(fill="x",pady=(5,0))
         self.scheduler_media_label=tk.Label(
-            self.content,
-            text=self._scheduler_media_text(),
-            bg=BG,
-            fg=MUTED,
-            justify="left",
-            wraplength=1000,
+            media_row,text=self._scheduler_media_text(),bg=PANEL,fg=WHITE,
+            justify="left",anchor="w",wraplength=780,
         )
-        self.scheduler_media_label.pack(anchor="w",pady=(8,4))
+        self.scheduler_media_label.pack(side="left",fill="x",expand=True)
+        tk.Button(
+            media_row,text="ADD MEDIA",command=self.select_scheduler_media,
+            bg=PANEL2,fg=GREEN,padx=12,
+        ).pack(side="right",padx=3)
+        tk.Button(
+            media_row,text="CLEAR",command=self.clear_scheduler_media,
+            bg=PANEL2,fg=WHITE,padx=12,
+        ).pack(side="right",padx=3)
+
+        # Safe Mode information
+        safe_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=12)
+        safe_box.pack(fill="x",pady=8)
+        tk.Label(
+            safe_box,text="SAFE MODE",bg=PANEL,fg=MUTED,
+            font=("Segoe UI",9,"bold"),
+        ).pack(anchor="w")
+        safe_grid=tk.Frame(safe_box,bg=PANEL); safe_grid.pack(fill="x",pady=(6,0))
+        safe_values=(
+            ("Minimum interval","60 min"),
+            ("Daily limit","8 / group / 24h"),
+            ("Duplicate cooldown","24 hours"),
+            ("Quiet hours","23:00 → 08:00"),
+        )
+        for i,(label,value) in enumerate(safe_values):
+            col=tk.Frame(safe_grid,bg=PANEL); col.grid(row=0,column=i,sticky="w",padx=(0,35))
+            tk.Label(col,text=label,bg=PANEL,fg=MUTED).pack(anchor="w")
+            tk.Label(col,text=value,bg=PANEL,fg=WHITE,font=("Segoe UI",10,"bold")).pack(anchor="w",pady=(2,0))
+
+        # Authorized groups
+        groups=self.storage.get_groups(enabled_only=True)
+        group_box=tk.Frame(self.content,bg=PANEL,padx=14,pady=10)
+        group_box.pack(fill="x",pady=8)
+        tk.Label(
+            group_box,
+            text=f"AUTHORIZED GROUPS   {len(groups)} ENABLED",
+            bg=PANEL,fg=GREEN if groups else RED,
+            font=("Segoe UI",9,"bold"),
+        ).pack(anchor="w")
+
+        controls=tk.Frame(self.content,bg=BG); controls.pack(fill="x",pady=(10,0))
+        tk.Button(
+            controls,text="START 24/7 BOT",
+            command=lambda:self.start_scheduler(True),
+            bg=GREEN,fg=BG,font=("Segoe UI",10,"bold"),padx=18,pady=9,
+        ).pack(side="left",padx=4)
+        tk.Button(
+            controls,text="START PREVIEW",
+            command=lambda:self.start_scheduler(False),
+            bg=PANEL2,fg=WHITE,padx=18,pady=9,
+        ).pack(side="left",padx=4)
+        tk.Button(
+            controls,text="STOP",
+            command=self.stop_scheduler,
+            bg=RED,fg=BG,font=("Segoe UI",10,"bold"),padx=18,pady=9,
+        ).pack(side="left",padx=4)
+        tk.Button(
+            controls,text="SEND MEDIA NOW",
+            command=self.send_media_now,
+            bg=PANEL2,fg=GREEN,padx=18,pady=9,
+        ).pack(side="right",padx=4)
+
+    def _scheduler_mode_changed(self):
+        mode=self.scheduler_mode.get()
+        self.storage.set_setting("scheduler_mode",mode)
+        # Refresh the dashboard so the selected mode is immediately visible.
+        # Do not restart a running scheduler automatically.
+        if hasattr(self,"_scheduler_mode_refresh_pending") and self._scheduler_mode_refresh_pending:
+            return
+        self._scheduler_mode_refresh_pending=True
+        self.after(100,self._finish_scheduler_mode_refresh)
+
+    def _finish_scheduler_mode_refresh(self):
+        self._scheduler_mode_refresh_pending=False
+        if self.winfo_exists():
+            self.show("scheduler")
 
     def _reload_scheduler_view(self):
         if not self.winfo_exists():return
