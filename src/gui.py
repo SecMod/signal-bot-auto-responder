@@ -185,7 +185,15 @@ class App(tk.Tk):
         self.gname=tk.Entry(f,width=25);self.gid=tk.Entry(f,width=45)
         self.gname.grid(row=0,column=0);self.gid.grid(row=0,column=1,padx=5)
         tk.Button(f,text="ADD GROUP",command=self.add_group,bg=GREEN,fg=BG).grid(row=0,column=2)
-        tk.Button(f,text="LOAD / REFRESH FROM SIGNAL",command=self.load_groups,bg=PANEL2,fg=WHITE).grid(row=0,column=3,padx=5)
+        self.load_groups_button=tk.Button(
+            f,text="LOAD / REFRESH FROM SIGNAL",command=self.load_groups,
+            bg=PANEL2,fg=WHITE,
+        )
+        self.load_groups_button.grid(row=0,column=3,padx=5)
+        self.groups_status=tk.Label(
+            self.content,text="Ready",bg=BG,fg=MUTED
+        )
+        self.groups_status.pack(anchor="w",pady=(0,3))
         tk.Label(self.content,text="Select groups below. Use the buttons to enable/disable them, or double-click a row to toggle.",bg=BG,fg=MUTED).pack(anchor="w")
         self.gtree=ttk.Treeview(self.content,columns=("name","id","enabled"),show="headings",selectmode="extended")
         self.gtree.heading("name",text="GROUP NAME"); self.gtree.heading("id",text="GROUP ID"); self.gtree.heading("enabled",text="ENABLED")
@@ -230,26 +238,72 @@ class App(tk.Tk):
         self.refresh_groups()
 
     def load_groups(self):
-        if not self.settings.signal_account:return messagebox.showwarning("Signal","Configure a Signal account first.")
+        if not self.settings.signal_account:
+            return messagebox.showwarning("Signal","Configure a Signal account first.")
+
+        # Never run signal-cli synchronously on Tkinter's main thread.
+        # receive/listGroups can block when signal-cli is busy or its local
+        # config is locked; doing that here makes the entire GUI appear hung.
+        button = getattr(self, "load_groups_button", None)
+        if button is not None:
+            button.configure(state="disabled")
+        status = getattr(self, "groups_status", None)
+        if status is not None:
+            status.configure(text="Loading groups from Signal…")
+
         from .signal_client import SignalClient
-        try:
-            groups=SignalClient(self.settings.signal_account,self.settings.signal_cli_path or "signal-cli").list_groups()
-            existing={g["group_id"] for g in self.storage.get_groups()}
-            added=0
-            for g in groups:
-                if g["group_id"] in existing:continue
-                try:
-                    self.storage.add_group(g["name"],g["group_id"],enabled=False)
-                    added += 1
-                    existing.add(g["group_id"])
-                except Exception:
-                    continue
-            self.storage.log("INFO",f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.")
-            self.refresh_groups()
-            messagebox.showinfo("Signal groups",f"Loaded {len(groups)} groups. {added} new groups were added as DISABLED. Enable only authorized groups.")
-        except Exception as e:
-            self.storage.log("ERROR",f"Signal group load failed: {e}")
-            messagebox.showerror("Signal",str(e))
+
+        def worker():
+            try:
+                client=SignalClient(
+                    self.settings.signal_account,
+                    self.settings.signal_cli_path or "signal-cli",
+                )
+                groups=client.list_groups()
+                existing={g["group_id"] for g in self.storage.get_groups()}
+                added=0
+                for g in groups:
+                    if g["group_id"] in existing:
+                        continue
+                    try:
+                        self.storage.add_group(g["name"],g["group_id"],enabled=False)
+                        added += 1
+                        existing.add(g["group_id"])
+                    except Exception:
+                        continue
+                self.storage.log(
+                    "INFO",
+                    f"Loaded {len(groups)} Signal groups; added {added} new groups as disabled.",
+                )
+                self.after(0,lambda:self._groups_load_finished(len(groups),added,None))
+            except Exception as e:
+                self.storage.log("ERROR",f"Signal group load failed: {e}")
+                self.after(0,lambda err=str(e):self._groups_load_finished(0,0,err))
+
+        threading.Thread(target=worker,daemon=True,name="signal-groups-loader").start()
+
+    def _groups_load_finished(self,count,added,error):
+        button = getattr(self, "load_groups_button", None)
+        if button is not None:
+            button.configure(state="normal")
+        status = getattr(self, "groups_status", None)
+        if status is not None:
+            status.configure(
+                text=(
+                    f"Loaded {count} groups • {added} new groups added as DISABLED."
+                    if error is None
+                    else f"Load failed: {error}"
+                )
+            )
+        self.refresh_groups()
+        if error is None:
+            messagebox.showinfo(
+                "Signal groups",
+                f"Loaded {count} groups. {added} new groups were added as DISABLED. "
+                "Enable only authorized groups.",
+            )
+        else:
+            messagebox.showerror("Signal",error)
 
     def _view_scheduler(self):
         self._title("SCHEDULER — 24/7 CONTROL")
