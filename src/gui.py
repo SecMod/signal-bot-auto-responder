@@ -318,14 +318,10 @@ class App(tk.Tk):
         status.pack(fill="x",pady=(0,10))
         left=tk.Frame(status,bg=PANEL); left.pack(side="left",fill="x",expand=True)
         tk.Label(
-            left,text=f"● BOT {state}",bg=PANEL,fg=state_fg,
-            font=("Segoe UI",14,"bold"),
-        ).pack(anchor="w")
-        tk.Label(
             left,
             text="24/7 scheduler service • GUI is the control panel",
             bg=PANEL,fg=MUTED,
-        ).pack(anchor="w",pady=(3,0))
+        ).pack(anchor="w")
 
         self.scheduler_status_label=tk.Label(
             left,
@@ -487,6 +483,11 @@ class App(tk.Tk):
             command=self.send_media_now,
             bg=PANEL2,fg=GREEN,padx=18,pady=9,
         ).pack(side="right",padx=4)
+
+        # Always refresh the newly created dashboard after rendering it.
+        # The scheduler's worker thread can report ONLINE before this view
+        # finishes rebuilding, which otherwise leaves the fresh labels stale.
+        self._update_scheduler_dashboard()
 
     def _scheduler_runtime_state(self, state):
         self.after(0, self._update_scheduler_dashboard)
