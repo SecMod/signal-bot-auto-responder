@@ -53,19 +53,43 @@ def build_sender(
         groups = storage.get_groups(enabled_only=True)
         if not groups:
             raise ValueError("No enabled authorized Signal groups configured.")
+
         sent = 0
+        failed = 0
+
         for group in groups:
-            client.send_to_group(
-                group["group_id"],
-                message,
-                attachments=attachments,
+            group_name = str(group.get("name", "(Unnamed group)")).strip()
+            try:
+                client.send_to_group(
+                    group["group_id"],
+                    message,
+                    attachments=attachments,
+                )
+                sent += 1
+            except Exception as exc:
+                failed += 1
+                storage.log(
+                    "ERROR",
+                    f"REAL: failed to send to authorized group "
+                    f"'{group_name}': {exc}",
+                )
+                # Continue with the remaining authorized groups instead of
+                # letting one Signal CLI failure stop the whole delivery pass.
+                continue
+
+        if failed:
+            storage.log(
+                "INFO",
+                f"REAL: delivery pass completed with {sent} successful "
+                f"and {failed} failed group(s); "
+                f"{len(attachments)} media file(s) attached.",
             )
-            sent += 1
-        storage.log(
-            "INFO",
-            f"REAL: sent approved message with {len(attachments)} media file(s) "
-            f"to {sent} authorized group(s).",
-        )
+        else:
+            storage.log(
+                "INFO",
+                f"REAL: sent approved message with {len(attachments)} media file(s) "
+                f"to {sent} authorized group(s).",
+            )
 
     storage.log(
         "INFO",
