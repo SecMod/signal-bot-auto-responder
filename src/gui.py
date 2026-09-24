@@ -10,6 +10,7 @@ from datetime import datetime
 from .config import Settings
 from .daily_content import generate_variations
 from .storage import Storage
+from .gui_auth import require_gui_password
 
 
 BG="#070a09"; PANEL="#101815"; PANEL2="#131d18"; GREEN="#39ff88"; WHITE="#f2fff8"; MUTED="#8da99b"; RED="#ff5c6c"
@@ -995,6 +996,11 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror("Logs",str(e),parent=self)
 
-def main():App().mainloop()
+def main():
+    if not require_gui_password():
+        return
+    App().mainloop()
 
-if __name__=="__main__":main()
+
+if __name__=="__main__":
+    main()
